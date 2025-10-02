@@ -1,0 +1,550 @@
+{"timestamp": "2025-09-30 23:43:09,257", "level": "INFO", "module": "vision", "function": "<module>", "line": 79, "message": "--- Iniciando prueba del Módulo de Visión con OCR ---"}
+{"timestamp": "2025-09-30 23:43:09,258", "level": "INFO", "module": "vision", "function": "__init__", "line": 19, "message": "Usando Tesseract desde la ruta: C:\\Program Files\\Tesseract-OCR\\tesseract.exe"}
+{"timestamp": "2025-09-30 23:43:09,260", "level": "DEBUG", "module": "vision", "function": "capturar_pantalla", "line": 24, "message": "Capturando pantalla."}
+{"timestamp": "2025-09-30 23:43:09,361", "level": "INFO", "module": "vision", "function": "guardar_imagen", "line": 29, "message": "Guardando imagen en 'prueba_vision_ocr.png'.", "extra_data": {"archivo": "prueba_vision_ocr.png"}}
+{"timestamp": "2025-09-30 23:43:09,481", "level": "INFO", "module": "vision", "function": "leer_texto_en_pantalla", "line": 42, "message": "Realizando OCR para leer texto en la imagen."}
+{"timestamp": "2025-09-30 23:43:09,482", "level": "ERROR", "module": "vision", "function": "leer_texto_en_pantalla", "line": 68, "message": "Tesseract no encontrado. Asegúrate de que está instalado y la ruta es correcta."}
+{"timestamp": "2025-09-30 23:43:09,482", "level": "WARNING", "module": "vision", "function": "<module>", "line": 96, "message": "No se detectó texto en la pantalla o Tesseract no está configurado correctamente."}
+{"timestamp": "2025-09-30 23:43:09,482", "level": "INFO", "module": "vision", "function": "<module>", "line": 98, "message": "--- Prueba de Visión finalizada ---"}
+{"timestamp": "2025-10-01 17:52:15,421", "level": "INFO", "module": "analizar_imagen", "function": "<module>", "line": 9, "message": "--- Analizando imagen con el módulo de visión ---"}
+{"timestamp": "2025-10-01 17:52:15,474", "level": "WARNING", "module": "vision", "function": "__init__", "line": 47, "message": "Tesseract no encontrado. El OCR no estará disponible."}
+{"timestamp": "2025-10-01 17:52:15,495", "level": "INFO", "module": "analizar_imagen", "function": "<module>", "line": 14, "message": "Imagen cargada exitosamente."}
+{"timestamp": "2025-10-01 17:52:15,495", "level": "INFO", "module": "vision", "function": "leer_texto_en_pantalla", "line": 70, "message": "Realizando OCR para leer texto en la imagen."}
+{"timestamp": "2025-10-01 17:52:15,498", "level": "ERROR", "module": "vision", "function": "leer_texto_en_pantalla", "line": 96, "message": "Tesseract no encontrado. Asegúrate de que está instalado y la ruta es correcta."}
+{"timestamp": "2025-10-01 17:52:15,499", "level": "WARNING", "module": "analizar_imagen", "function": "<module>", "line": 23, "message": "No se detectó texto en la imagen o Tesseract no está configurado correctamente."}
+{"timestamp": "2025-10-01 17:52:15,499", "level": "INFO", "module": "analizar_imagen", "function": "<module>", "line": 30, "message": "--- Análisis de imagen finalizado ---"}
+{"timestamp": "2025-10-02 18:37:15,227", "level": "INFO", "module": "agente", "function": "__init__", "line": 22, "message": "Inicializando el agente InteractIA..."}
+{"timestamp": "2025-10-02 18:37:15,260", "level": "WARNING", "module": "vision", "function": "__init__", "line": 47, "message": "Tesseract no encontrado. El OCR no estará disponible."}
+{"timestamp": "2025-10-02 18:37:24,145", "level": "INFO", "module": "agente", "function": "__init__", "line": 40, "message": "Modelo de IA configurado exitosamente."}
+{"timestamp": "2025-10-02 18:37:24,206", "level": "INFO", "module": "agente", "function": "establecer_objetivo", "line": 48, "message": "Objetivo establecido: Encuentra el enlace de descarga del instalador de Tesseract y haz clic en él."}
+{"timestamp": "2025-10-02 18:37:24,206", "level": "INFO", "module": "agente", "function": "run", "line": 230, "message": "--- Ciclo 1/10 ---"}
+{"timestamp": "2025-10-02 18:37:24,206", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:37:24,278", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: 'gemini.md - InteractIA - Visual Studio Code'"}
+{"timestamp": "2025-10-02 18:37:24,279", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:37:24,330", "level": "INFO", "module": "agente", "function": "llm_call", "line": 152, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:37:27,864", "level": "INFO", "module": "agente", "function": "llm_call", "line": 165, "message": "Decisión recibida del modelo: {'accion': 'abrir_app', 'params': {'app': 'chrome'}, 'contexto': {'titulo_ventana_contiene': ''}}"}
+{"timestamp": "2025-10-02 18:37:27,864", "level": "INFO", "module": "agente", "function": "actuar", "line": 178, "message": "--- Fase: Actuar (abrir_app) ---"}
+{"timestamp": "2025-10-02 18:37:27,864", "level": "INFO", "module": "controlador", "function": "abrir_aplicacion", "line": 38, "message": "Abriendo aplicación: 'chrome'.", "extra_data": {"aplicacion": "chrome"}}
+{"timestamp": "2025-10-02 18:37:27,919", "level": "INFO", "module": "controlador", "function": "esperar", "line": 51, "message": "Esperando 2 segundos.", "extra_data": {"segundos": 2}}
+{"timestamp": "2025-10-02 18:37:29,923", "level": "INFO", "module": "controlador", "function": "abrir_aplicacion", "line": 46, "message": "Ventana redimensionada y movida."}
+{"timestamp": "2025-10-02 18:37:31,923", "level": "INFO", "module": "agente", "function": "run", "line": 230, "message": "--- Ciclo 2/10 ---"}
+{"timestamp": "2025-10-02 18:37:31,923", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:37:31,987", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: 'Nueva pestaña - Google Chrome'"}
+{"timestamp": "2025-10-02 18:37:31,988", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:37:32,037", "level": "INFO", "module": "agente", "function": "llm_call", "line": 152, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:37:35,329", "level": "INFO", "module": "agente", "function": "llm_call", "line": 165, "message": "Decisión recibida del modelo: {'accion': 'escribir', 'params': {'texto': 'Tesseract installer download'}, 'contexto': {'titulo_ventana_contiene': 'Nueva pestaña'}}"}
+{"timestamp": "2025-10-02 18:37:35,329", "level": "INFO", "module": "agente", "function": "actuar", "line": 178, "message": "--- Fase: Actuar (escribir) ---"}
+{"timestamp": "2025-10-02 18:37:35,331", "level": "INFO", "module": "controlador", "function": "escribir", "line": 29, "message": "Escribiendo texto.", "extra_data": {"longitud": 28, "intervalo": 0.05}}
+{"timestamp": "2025-10-02 18:37:38,868", "level": "INFO", "module": "agente", "function": "run", "line": 230, "message": "--- Ciclo 3/10 ---"}
+{"timestamp": "2025-10-02 18:37:38,868", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:37:38,941", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: 'Nueva pestaña - Google Chrome'"}
+{"timestamp": "2025-10-02 18:37:38,941", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:37:38,989", "level": "INFO", "module": "agente", "function": "llm_call", "line": 152, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:37:42,842", "level": "INFO", "module": "agente", "function": "llm_call", "line": 165, "message": "Decisión recibida del modelo: {'accion': 'presionar_tecla', 'params': {'tecla': 'enter'}, 'contexto': {'titulo_ventana_contiene': 'Nueva pestaña'}}"}
+{"timestamp": "2025-10-02 18:37:42,842", "level": "INFO", "module": "agente", "function": "actuar", "line": 178, "message": "--- Fase: Actuar (presionar_tecla) ---"}
+{"timestamp": "2025-10-02 18:37:42,843", "level": "INFO", "module": "controlador", "function": "presionar_tecla", "line": 59, "message": "Presionando tecla: 'enter'.", "extra_data": {"tecla": "enter"}}
+{"timestamp": "2025-10-02 18:37:44,945", "level": "INFO", "module": "agente", "function": "run", "line": 230, "message": "--- Ciclo 4/10 ---"}
+{"timestamp": "2025-10-02 18:37:44,945", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:37:45,007", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: 'Tesseract installer download - Buscar con Google - Google Chrome'"}
+{"timestamp": "2025-10-02 18:37:45,007", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:37:45,055", "level": "INFO", "module": "agente", "function": "llm_call", "line": 152, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:37:50,163", "level": "INFO", "module": "agente", "function": "llm_call", "line": 165, "message": "Decisión recibida del modelo: {'accion': 'arrastrar_barra', 'params': {'direccion': 'vertical', 'porcentaje': 50}, 'contexto': {'titulo_ventana_contiene': 'Tesseract installer download - '}}"}
+{"timestamp": "2025-10-02 18:37:50,163", "level": "INFO", "module": "agente", "function": "actuar", "line": 178, "message": "--- Fase: Actuar (arrastrar_barra) ---"}
+{"timestamp": "2025-10-02 18:37:50,164", "level": "INFO", "module": "controlador", "function": "arrastrar_barra", "line": 71, "message": "Arrastrando barra de scroll hacia vertical un 50%."}
+{"timestamp": "2025-10-02 18:37:51,439", "level": "INFO", "module": "controlador", "function": "arrastrar_barra", "line": 110, "message": "Arrastre de barra de scroll completado."}
+{"timestamp": "2025-10-02 18:37:53,440", "level": "INFO", "module": "agente", "function": "run", "line": 230, "message": "--- Ciclo 5/10 ---"}
+{"timestamp": "2025-10-02 18:37:53,440", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:37:53,507", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: 'Tesseract installer download - Buscar con Google - Google Chrome'"}
+{"timestamp": "2025-10-02 18:37:53,508", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:37:53,554", "level": "INFO", "module": "agente", "function": "llm_call", "line": 152, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:37:59,059", "level": "INFO", "module": "agente", "function": "llm_call", "line": 165, "message": "Decisión recibida del modelo: {'accion': 'clic', 'params': {'x': 359, 'y': 599}, 'contexto': {'titulo_ventana_contiene': 'Tesseract installer download - '}}"}
+{"timestamp": "2025-10-02 18:37:59,060", "level": "INFO", "module": "agente", "function": "actuar", "line": 178, "message": "--- Fase: Actuar (clic) ---"}
+{"timestamp": "2025-10-02 18:37:59,060", "level": "INFO", "module": "controlador", "function": "clic", "line": 55, "message": "Haciendo clic con botón left.", "extra_data": {"x": 359, "y": 599, "boton": "left"}}
+{"timestamp": "2025-10-02 18:38:01,161", "level": "INFO", "module": "agente", "function": "run", "line": 230, "message": "--- Ciclo 6/10 ---"}
+{"timestamp": "2025-10-02 18:38:01,162", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:38:01,241", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: 'Tesseract installer download - Buscar con Google - Google Chrome'"}
+{"timestamp": "2025-10-02 18:38:01,241", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:38:01,292", "level": "INFO", "module": "agente", "function": "llm_call", "line": 152, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:38:11,021", "level": "INFO", "module": "agente", "function": "llm_call", "line": 165, "message": "Decisión recibida del modelo: {'accion': 'clic', 'params': {'x': 359, 'y': 599}, 'contexto': {'titulo_ventana_contiene': 'Tesseract installer download - '}}"}
+{"timestamp": "2025-10-02 18:38:11,022", "level": "INFO", "module": "agente", "function": "actuar", "line": 178, "message": "--- Fase: Actuar (clic) ---"}
+{"timestamp": "2025-10-02 18:38:11,022", "level": "INFO", "module": "controlador", "function": "clic", "line": 55, "message": "Haciendo clic con botón left.", "extra_data": {"x": 359, "y": 599, "boton": "left"}}
+{"timestamp": "2025-10-02 18:38:13,135", "level": "INFO", "module": "agente", "function": "run", "line": 230, "message": "--- Ciclo 7/10 ---"}
+{"timestamp": "2025-10-02 18:38:13,136", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:38:13,202", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: 'Tesseract installer download - Buscar con Google - Google Chrome'"}
+{"timestamp": "2025-10-02 18:38:13,203", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:38:13,250", "level": "INFO", "module": "agente", "function": "llm_call", "line": 152, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:38:19,463", "level": "INFO", "module": "agente", "function": "llm_call", "line": 165, "message": "Decisión recibida del modelo: {'accion': 'clic', 'params': {'x': 350, 'y': 599}, 'contexto': {'titulo_ventana_contiene': 'Tesseract installer download - '}}"}
+{"timestamp": "2025-10-02 18:38:19,463", "level": "INFO", "module": "agente", "function": "actuar", "line": 178, "message": "--- Fase: Actuar (clic) ---"}
+{"timestamp": "2025-10-02 18:38:19,463", "level": "INFO", "module": "controlador", "function": "clic", "line": 55, "message": "Haciendo clic con botón left.", "extra_data": {"x": 350, "y": 599, "boton": "left"}}
+{"timestamp": "2025-10-02 18:38:21,564", "level": "INFO", "module": "agente", "function": "run", "line": 230, "message": "--- Ciclo 8/10 ---"}
+{"timestamp": "2025-10-02 18:38:21,565", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:38:21,639", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: 'Tesseract installer download - Buscar con Google - Google Chrome'"}
+{"timestamp": "2025-10-02 18:38:21,639", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:38:21,687", "level": "INFO", "module": "agente", "function": "llm_call", "line": 152, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:38:28,684", "level": "INFO", "module": "agente", "function": "llm_call", "line": 165, "message": "Decisión recibida del modelo: {'accion': 'arrastrar_barra', 'params': {'direccion': 'vertical', 'porcentaje': 50}, 'contexto': {'titulo_ventana_contiene': 'Tesseract installer download - '}}"}
+{"timestamp": "2025-10-02 18:38:28,684", "level": "INFO", "module": "agente", "function": "actuar", "line": 178, "message": "--- Fase: Actuar (arrastrar_barra) ---"}
+{"timestamp": "2025-10-02 18:38:28,685", "level": "INFO", "module": "controlador", "function": "arrastrar_barra", "line": 71, "message": "Arrastrando barra de scroll hacia vertical un 50%."}
+{"timestamp": "2025-10-02 18:38:29,958", "level": "INFO", "module": "controlador", "function": "arrastrar_barra", "line": 110, "message": "Arrastre de barra de scroll completado."}
+{"timestamp": "2025-10-02 18:38:31,959", "level": "INFO", "module": "agente", "function": "run", "line": 230, "message": "--- Ciclo 9/10 ---"}
+{"timestamp": "2025-10-02 18:38:31,960", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:38:32,025", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: 'Tesseract installer download - Buscar con Google - Google Chrome'"}
+{"timestamp": "2025-10-02 18:38:32,026", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:38:32,073", "level": "INFO", "module": "agente", "function": "llm_call", "line": 152, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:38:38,338", "level": "INFO", "module": "agente", "function": "llm_call", "line": 165, "message": "Decisión recibida del modelo: {'accion': 'clic', 'params': {'x': 359, 'y': 708}, 'contexto': {'titulo_ventana_contiene': 'Tesseract installer download -'}}"}
+{"timestamp": "2025-10-02 18:38:38,338", "level": "INFO", "module": "agente", "function": "actuar", "line": 178, "message": "--- Fase: Actuar (clic) ---"}
+{"timestamp": "2025-10-02 18:38:38,339", "level": "INFO", "module": "controlador", "function": "clic", "line": 55, "message": "Haciendo clic con botón left.", "extra_data": {"x": 359, "y": 708, "boton": "left"}}
+{"timestamp": "2025-10-02 18:38:40,440", "level": "INFO", "module": "agente", "function": "run", "line": 230, "message": "--- Ciclo 10/10 ---"}
+{"timestamp": "2025-10-02 18:38:40,441", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:38:40,512", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: 'Tesseract installer download - Buscar con Google - Google Chrome'"}
+{"timestamp": "2025-10-02 18:38:40,513", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:38:40,560", "level": "INFO", "module": "agente", "function": "llm_call", "line": 152, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:38:48,130", "level": "INFO", "module": "agente", "function": "llm_call", "line": 165, "message": "Decisión recibida del modelo: {'accion': 'clic', 'params': {'x': 359, 'y': 788}, 'contexto': {'titulo_ventana_contiene': 'Tesseract installer download -'}}"}
+{"timestamp": "2025-10-02 18:38:48,130", "level": "INFO", "module": "agente", "function": "actuar", "line": 178, "message": "--- Fase: Actuar (clic) ---"}
+{"timestamp": "2025-10-02 18:38:48,131", "level": "INFO", "module": "controlador", "function": "clic", "line": 55, "message": "Haciendo clic con botón left.", "extra_data": {"x": 359, "y": 788, "boton": "left"}}
+{"timestamp": "2025-10-02 18:46:20,912", "level": "INFO", "module": "agente", "function": "__init__", "line": 22, "message": "Inicializando el agente InteractIA..."}
+{"timestamp": "2025-10-02 18:46:20,944", "level": "WARNING", "module": "vision", "function": "__init__", "line": 47, "message": "Tesseract no encontrado. El OCR no estará disponible."}
+{"timestamp": "2025-10-02 18:46:29,858", "level": "INFO", "module": "agente", "function": "__init__", "line": 40, "message": "Modelo de IA configurado exitosamente."}
+{"timestamp": "2025-10-02 18:46:29,999", "level": "INFO", "module": "agente", "function": "establecer_objetivo", "line": 48, "message": "Objetivo establecido: Encuentra el enlace de descarga del instalador de Tesseract y haz clic en él."}
+{"timestamp": "2025-10-02 18:46:30,000", "level": "INFO", "module": "agente", "function": "run", "line": 230, "message": "--- Ciclo 1/10 ---"}
+{"timestamp": "2025-10-02 18:46:30,001", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:46:30,069", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: 'gemini.md - InteractIA - Visual Studio Code'"}
+{"timestamp": "2025-10-02 18:46:30,070", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:46:30,127", "level": "INFO", "module": "agente", "function": "llm_call", "line": 152, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:46:34,256", "level": "INFO", "module": "agente", "function": "llm_call", "line": 165, "message": "Decisión recibida del modelo: {'accion': 'abrir_app', 'params': {'app': 'chrome.exe'}, 'contexto': {'titulo_ventana_contiene': 'InteractIA'}}"}
+{"timestamp": "2025-10-02 18:46:34,256", "level": "INFO", "module": "agente", "function": "actuar", "line": 178, "message": "--- Fase: Actuar (abrir_app) ---"}
+{"timestamp": "2025-10-02 18:46:34,256", "level": "INFO", "module": "controlador", "function": "abrir_aplicacion", "line": 38, "message": "Abriendo aplicación: 'chrome.exe'.", "extra_data": {"aplicacion": "chrome.exe"}}
+{"timestamp": "2025-10-02 18:46:34,315", "level": "INFO", "module": "controlador", "function": "esperar", "line": 51, "message": "Esperando 2 segundos.", "extra_data": {"segundos": 2}}
+{"timestamp": "2025-10-02 18:46:36,319", "level": "INFO", "module": "controlador", "function": "abrir_aplicacion", "line": 46, "message": "Ventana redimensionada y movida."}
+{"timestamp": "2025-10-02 18:46:38,319", "level": "INFO", "module": "agente", "function": "run", "line": 230, "message": "--- Ciclo 2/10 ---"}
+{"timestamp": "2025-10-02 18:46:38,320", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:46:38,388", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: 'Nueva pestaña - Google Chrome'"}
+{"timestamp": "2025-10-02 18:46:38,389", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:46:38,444", "level": "INFO", "module": "agente", "function": "llm_call", "line": 152, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:46:43,695", "level": "INFO", "module": "agente", "function": "llm_call", "line": 165, "message": "Decisión recibida del modelo: {'accion': 'escribir', 'params': {'texto': 'Tesseract installer download'}, 'contexto': {'titulo_ventana_contiene': 'Nueva pestaña'}}"}
+{"timestamp": "2025-10-02 18:46:43,695", "level": "INFO", "module": "agente", "function": "actuar", "line": 178, "message": "--- Fase: Actuar (escribir) ---"}
+{"timestamp": "2025-10-02 18:46:43,697", "level": "INFO", "module": "controlador", "function": "escribir", "line": 29, "message": "Escribiendo texto.", "extra_data": {"longitud": 28, "intervalo": 0.05}}
+{"timestamp": "2025-10-02 18:46:47,228", "level": "INFO", "module": "agente", "function": "run", "line": 230, "message": "--- Ciclo 3/10 ---"}
+{"timestamp": "2025-10-02 18:46:47,229", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:46:47,290", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: 'Nueva pestaña - Google Chrome'"}
+{"timestamp": "2025-10-02 18:46:47,291", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:46:47,346", "level": "INFO", "module": "agente", "function": "llm_call", "line": 152, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:46:51,553", "level": "INFO", "module": "agente", "function": "llm_call", "line": 165, "message": "Decisión recibida del modelo: {'accion': 'presionar_tecla', 'params': {'tecla': 'enter'}, 'contexto': {'titulo_ventana_contiene': 'Nueva pestaña'}}"}
+{"timestamp": "2025-10-02 18:46:51,553", "level": "INFO", "module": "agente", "function": "actuar", "line": 178, "message": "--- Fase: Actuar (presionar_tecla) ---"}
+{"timestamp": "2025-10-02 18:46:51,553", "level": "INFO", "module": "controlador", "function": "presionar_tecla", "line": 59, "message": "Presionando tecla: 'enter'.", "extra_data": {"tecla": "enter"}}
+{"timestamp": "2025-10-02 18:46:53,654", "level": "INFO", "module": "agente", "function": "run", "line": 230, "message": "--- Ciclo 4/10 ---"}
+{"timestamp": "2025-10-02 18:46:53,654", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:46:53,722", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: 'Tesseract installer download - Buscar con Google - Google Chrome'"}
+{"timestamp": "2025-10-02 18:46:53,723", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:46:53,779", "level": "INFO", "module": "agente", "function": "llm_call", "line": 152, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:47:00,507", "level": "INFO", "module": "agente", "function": "llm_call", "line": 165, "message": "Decisión recibida del modelo: {'accion': 'clic', 'params': {'x': 120, 'y': 705}, 'contexto': {'titulo_ventana_contiene': 'Tesseract installer download'}}"}
+{"timestamp": "2025-10-02 18:47:00,507", "level": "INFO", "module": "agente", "function": "actuar", "line": 178, "message": "--- Fase: Actuar (clic) ---"}
+{"timestamp": "2025-10-02 18:47:00,508", "level": "INFO", "module": "controlador", "function": "clic", "line": 55, "message": "Haciendo clic con botón left.", "extra_data": {"x": 120, "y": 705, "boton": "left"}}
+{"timestamp": "2025-10-02 18:47:02,619", "level": "INFO", "module": "agente", "function": "run", "line": 230, "message": "--- Ciclo 5/10 ---"}
+{"timestamp": "2025-10-02 18:47:02,619", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:47:02,687", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: 'Tesseract installer download - Buscar con Google - Google Chrome'"}
+{"timestamp": "2025-10-02 18:47:02,688", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:47:02,742", "level": "INFO", "module": "agente", "function": "llm_call", "line": 152, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:47:11,602", "level": "INFO", "module": "agente", "function": "llm_call", "line": 165, "message": "Decisión recibida del modelo: {'accion': 'clic', 'params': {'x': 120, 'y': 705}, 'contexto': {'titulo_ventana_contiene': 'Tesseract installer download'}}"}
+{"timestamp": "2025-10-02 18:47:11,602", "level": "INFO", "module": "agente", "function": "actuar", "line": 178, "message": "--- Fase: Actuar (clic) ---"}
+{"timestamp": "2025-10-02 18:47:11,603", "level": "INFO", "module": "controlador", "function": "clic", "line": 55, "message": "Haciendo clic con botón left.", "extra_data": {"x": 120, "y": 705, "boton": "left"}}
+{"timestamp": "2025-10-02 18:47:13,704", "level": "INFO", "module": "agente", "function": "run", "line": 230, "message": "--- Ciclo 6/10 ---"}
+{"timestamp": "2025-10-02 18:47:13,704", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:47:13,793", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: 'Tesseract installer download - Buscar con Google - Google Chrome'"}
+{"timestamp": "2025-10-02 18:47:13,794", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:47:13,852", "level": "INFO", "module": "agente", "function": "llm_call", "line": 152, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:47:18,268", "level": "INFO", "module": "agente", "function": "llm_call", "line": 165, "message": "Decisión recibida del modelo: {'accion': 'clic', 'params': {'x': 120, 'y': 705}, 'contexto': {'titulo_ventana_contiene': 'Tesseract installer download'}}"}
+{"timestamp": "2025-10-02 18:47:18,268", "level": "INFO", "module": "agente", "function": "actuar", "line": 178, "message": "--- Fase: Actuar (clic) ---"}
+{"timestamp": "2025-10-02 18:47:18,269", "level": "INFO", "module": "controlador", "function": "clic", "line": 55, "message": "Haciendo clic con botón left.", "extra_data": {"x": 120, "y": 705, "boton": "left"}}
+{"timestamp": "2025-10-02 18:47:20,373", "level": "INFO", "module": "agente", "function": "run", "line": 230, "message": "--- Ciclo 7/10 ---"}
+{"timestamp": "2025-10-02 18:47:20,374", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:47:20,436", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: 'Tesseract installer download - Buscar con Google - Google Chrome'"}
+{"timestamp": "2025-10-02 18:47:20,437", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:47:20,491", "level": "INFO", "module": "agente", "function": "llm_call", "line": 152, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:47:27,326", "level": "INFO", "module": "agente", "function": "llm_call", "line": 165, "message": "Decisión recibida del modelo: {'accion': 'clic', 'params': {'x': 350, 'y': 880}, 'contexto': {'titulo_ventana_contiene': 'Tesseract installer download'}}"}
+{"timestamp": "2025-10-02 18:47:27,326", "level": "INFO", "module": "agente", "function": "actuar", "line": 178, "message": "--- Fase: Actuar (clic) ---"}
+{"timestamp": "2025-10-02 18:47:27,327", "level": "INFO", "module": "controlador", "function": "clic", "line": 55, "message": "Haciendo clic con botón left.", "extra_data": {"x": 350, "y": 880, "boton": "left"}}
+{"timestamp": "2025-10-02 18:47:29,433", "level": "INFO", "module": "agente", "function": "run", "line": 230, "message": "--- Ciclo 8/10 ---"}
+{"timestamp": "2025-10-02 18:47:29,434", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:47:29,511", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: 'Tesseract installer download - Buscar con Google - Google Chrome'"}
+{"timestamp": "2025-10-02 18:47:29,511", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:47:29,568", "level": "INFO", "module": "agente", "function": "llm_call", "line": 152, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:48:20,056", "level": "ERROR", "module": "agente", "function": "llm_call", "line": 168, "message": "ERROR al llamar al modelo de IA o parsear su respuesta: Expecting value: line 1 column 1 (char 0)"}
+{"timestamp": "2025-10-02 18:48:20,056", "level": "ERROR", "module": "agente", "function": "llm_call", "line": 171, "message": "Contexto del Error (Feedback del Prompt): "}
+{"timestamp": "2025-10-02 18:48:20,056", "level": "INFO", "module": "agente", "function": "actuar", "line": 178, "message": "--- Fase: Actuar (finalizar) ---"}
+{"timestamp": "2025-10-02 18:48:20,056", "level": "INFO", "module": "agente", "function": "run", "line": 235, "message": "Agente finalizando. Razón: Error en el módulo de decisión"}
+{"timestamp": "2025-10-02 18:49:23,893", "level": "INFO", "module": "agente", "function": "__init__", "line": 22, "message": "Inicializando el agente InteractIA..."}
+{"timestamp": "2025-10-02 18:49:23,909", "level": "INFO", "module": "vision", "function": "__init__", "line": 45, "message": "Usando Tesseract desde la ruta: C:\\Program Files\\Tesseract-OCR\\tesseract.exe"}
+{"timestamp": "2025-10-02 18:49:32,815", "level": "INFO", "module": "agente", "function": "__init__", "line": 40, "message": "Modelo de IA configurado exitosamente."}
+{"timestamp": "2025-10-02 18:49:32,944", "level": "INFO", "module": "agente", "function": "establecer_objetivo", "line": 48, "message": "Objetivo establecido: Encuentra el enlace de descarga del instalador de Tesseract y haz clic en él."}
+{"timestamp": "2025-10-02 18:49:32,944", "level": "INFO", "module": "agente", "function": "run", "line": 230, "message": "--- Ciclo 1/10 ---"}
+{"timestamp": "2025-10-02 18:49:32,945", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:49:33,007", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: 'gemini.md - InteractIA - Visual Studio Code'"}
+{"timestamp": "2025-10-02 18:49:33,007", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:49:33,061", "level": "INFO", "module": "agente", "function": "llm_call", "line": 152, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:49:37,990", "level": "INFO", "module": "agente", "function": "llm_call", "line": 165, "message": "Decisión recibida del modelo: {'accion': 'abrir_app', 'params': {'app': 'chrome.exe'}, 'contexto': {'titulo_ventana_contiene': 'InteractIA'}}"}
+{"timestamp": "2025-10-02 18:49:37,991", "level": "INFO", "module": "agente", "function": "actuar", "line": 178, "message": "--- Fase: Actuar (abrir_app) ---"}
+{"timestamp": "2025-10-02 18:49:37,991", "level": "INFO", "module": "controlador", "function": "abrir_aplicacion", "line": 38, "message": "Abriendo aplicación: 'chrome.exe'.", "extra_data": {"aplicacion": "chrome.exe"}}
+{"timestamp": "2025-10-02 18:49:38,044", "level": "INFO", "module": "controlador", "function": "esperar", "line": 51, "message": "Esperando 2 segundos.", "extra_data": {"segundos": 2}}
+{"timestamp": "2025-10-02 18:49:40,047", "level": "INFO", "module": "controlador", "function": "abrir_aplicacion", "line": 46, "message": "Ventana redimensionada y movida."}
+{"timestamp": "2025-10-02 18:49:42,049", "level": "INFO", "module": "agente", "function": "run", "line": 230, "message": "--- Ciclo 2/10 ---"}
+{"timestamp": "2025-10-02 18:49:42,049", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:49:42,119", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: 'Nueva pestaña - Google Chrome'"}
+{"timestamp": "2025-10-02 18:49:42,120", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:49:42,174", "level": "INFO", "module": "agente", "function": "llm_call", "line": 152, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:49:45,984", "level": "INFO", "module": "agente", "function": "llm_call", "line": 165, "message": "Decisión recibida del modelo: {'accion': 'escribir', 'params': {'texto': 'Tesseract installer download'}, 'contexto': {'titulo_ventana_contiene': 'Nueva pestaña'}}"}
+{"timestamp": "2025-10-02 18:49:45,985", "level": "INFO", "module": "agente", "function": "actuar", "line": 178, "message": "--- Fase: Actuar (escribir) ---"}
+{"timestamp": "2025-10-02 18:49:45,985", "level": "INFO", "module": "controlador", "function": "escribir", "line": 29, "message": "Escribiendo texto.", "extra_data": {"longitud": 28, "intervalo": 0.05}}
+{"timestamp": "2025-10-02 18:49:49,513", "level": "INFO", "module": "agente", "function": "run", "line": 230, "message": "--- Ciclo 3/10 ---"}
+{"timestamp": "2025-10-02 18:49:49,514", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:49:49,585", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: 'Nueva pestaña - Google Chrome'"}
+{"timestamp": "2025-10-02 18:49:49,586", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:49:49,641", "level": "INFO", "module": "agente", "function": "llm_call", "line": 152, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:49:53,976", "level": "INFO", "module": "agente", "function": "llm_call", "line": 165, "message": "Decisión recibida del modelo: {'accion': 'presionar_tecla', 'params': {'tecla': 'enter'}, 'contexto': {'titulo_ventana_contiene': 'Nueva pestaña'}}"}
+{"timestamp": "2025-10-02 18:49:53,976", "level": "INFO", "module": "agente", "function": "actuar", "line": 178, "message": "--- Fase: Actuar (presionar_tecla) ---"}
+{"timestamp": "2025-10-02 18:49:53,977", "level": "INFO", "module": "controlador", "function": "presionar_tecla", "line": 59, "message": "Presionando tecla: 'enter'.", "extra_data": {"tecla": "enter"}}
+{"timestamp": "2025-10-02 18:49:56,078", "level": "INFO", "module": "agente", "function": "run", "line": 230, "message": "--- Ciclo 4/10 ---"}
+{"timestamp": "2025-10-02 18:49:56,078", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:49:56,159", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: 'Tesseract installer download - Buscar con Google - Google Chrome'"}
+{"timestamp": "2025-10-02 18:49:56,160", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:49:56,210", "level": "INFO", "module": "agente", "function": "llm_call", "line": 152, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:50:01,702", "level": "INFO", "module": "agente", "function": "llm_call", "line": 165, "message": "Decisión recibida del modelo: {'accion': 'clic', 'params': {'x': 218, 'y': 382}, 'contexto': {'titulo_ventana_contiene': 'Tesseract installer download'}}"}
+{"timestamp": "2025-10-02 18:50:01,702", "level": "INFO", "module": "agente", "function": "actuar", "line": 178, "message": "--- Fase: Actuar (clic) ---"}
+{"timestamp": "2025-10-02 18:50:01,702", "level": "INFO", "module": "controlador", "function": "clic", "line": 55, "message": "Haciendo clic con botón left.", "extra_data": {"x": 218, "y": 382, "boton": "left"}}
+{"timestamp": "2025-10-02 18:50:03,818", "level": "INFO", "module": "agente", "function": "run", "line": 230, "message": "--- Ciclo 5/10 ---"}
+{"timestamp": "2025-10-02 18:50:03,818", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:50:03,892", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: 'Tesseract installer download - Buscar con Google - Google Chrome'"}
+{"timestamp": "2025-10-02 18:50:03,893", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:50:03,946", "level": "INFO", "module": "agente", "function": "llm_call", "line": 152, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:50:11,193", "level": "INFO", "module": "agente", "function": "llm_call", "line": 165, "message": "Decisión recibida del modelo: {'accion': 'clic', 'params': {'x': 218, 'y': 553}, 'contexto': {'titulo_ventana_contiene': 'Tesseract installer download'}}"}
+{"timestamp": "2025-10-02 18:50:11,193", "level": "INFO", "module": "agente", "function": "actuar", "line": 178, "message": "--- Fase: Actuar (clic) ---"}
+{"timestamp": "2025-10-02 18:50:11,194", "level": "INFO", "module": "controlador", "function": "clic", "line": 55, "message": "Haciendo clic con botón left.", "extra_data": {"x": 218, "y": 553, "boton": "left"}}
+{"timestamp": "2025-10-02 18:50:13,302", "level": "INFO", "module": "agente", "function": "run", "line": 230, "message": "--- Ciclo 6/10 ---"}
+{"timestamp": "2025-10-02 18:50:13,302", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:50:13,370", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: 'Downloads | tessdoc - Google Chrome'"}
+{"timestamp": "2025-10-02 18:50:13,371", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:50:13,424", "level": "INFO", "module": "agente", "function": "llm_call", "line": 152, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:50:17,328", "level": "INFO", "module": "agente", "function": "llm_call", "line": 165, "message": "Decisión recibida del modelo: {'accion': 'arrastrar_barra', 'params': {'direccion': 'vertical', 'porcentaje': 50}, 'contexto': {'titulo_ventana_contiene': 'Downloads | tessdoc'}}"}
+{"timestamp": "2025-10-02 18:50:17,328", "level": "INFO", "module": "agente", "function": "actuar", "line": 178, "message": "--- Fase: Actuar (arrastrar_barra) ---"}
+{"timestamp": "2025-10-02 18:50:17,329", "level": "INFO", "module": "controlador", "function": "arrastrar_barra", "line": 71, "message": "Arrastrando barra de scroll hacia vertical un 50%."}
+{"timestamp": "2025-10-02 18:50:18,616", "level": "INFO", "module": "controlador", "function": "arrastrar_barra", "line": 110, "message": "Arrastre de barra de scroll completado."}
+{"timestamp": "2025-10-02 18:50:20,617", "level": "INFO", "module": "agente", "function": "run", "line": 230, "message": "--- Ciclo 7/10 ---"}
+{"timestamp": "2025-10-02 18:50:20,617", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:50:20,687", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: 'Downloads | tessdoc - Google Chrome'"}
+{"timestamp": "2025-10-02 18:50:20,688", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:50:20,741", "level": "INFO", "module": "agente", "function": "llm_call", "line": 152, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:50:28,211", "level": "INFO", "module": "agente", "function": "llm_call", "line": 165, "message": "Decisión recibida del modelo: {'accion': 'clic', 'params': {'x': 200, 'y': 600}, 'contexto': {'titulo_ventana_contiene': 'Downloads | tessdoc'}}"}
+{"timestamp": "2025-10-02 18:50:28,211", "level": "INFO", "module": "agente", "function": "actuar", "line": 178, "message": "--- Fase: Actuar (clic) ---"}
+{"timestamp": "2025-10-02 18:50:28,212", "level": "INFO", "module": "controlador", "function": "clic", "line": 55, "message": "Haciendo clic con botón left.", "extra_data": {"x": 200, "y": 600, "boton": "left"}}
+{"timestamp": "2025-10-02 18:50:30,317", "level": "INFO", "module": "agente", "function": "run", "line": 230, "message": "--- Ciclo 8/10 ---"}
+{"timestamp": "2025-10-02 18:50:30,318", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:50:30,385", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: 'Introduction | tessdoc - Google Chrome'"}
+{"timestamp": "2025-10-02 18:50:30,386", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:50:30,449", "level": "INFO", "module": "agente", "function": "llm_call", "line": 152, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:50:34,719", "level": "INFO", "module": "agente", "function": "llm_call", "line": 165, "message": "Decisión recibida del modelo: {'accion': 'clic', 'params': {'x': 401, 'y': 194}, 'contexto': {'titulo_ventana_contiene': 'Introduction | tessdoc'}}"}
+{"timestamp": "2025-10-02 18:50:34,720", "level": "INFO", "module": "agente", "function": "actuar", "line": 178, "message": "--- Fase: Actuar (clic) ---"}
+{"timestamp": "2025-10-02 18:50:34,720", "level": "INFO", "module": "controlador", "function": "clic", "line": 55, "message": "Haciendo clic con botón left.", "extra_data": {"x": 401, "y": 194, "boton": "left"}}
+{"timestamp": "2025-10-02 18:50:36,842", "level": "INFO", "module": "agente", "function": "run", "line": 230, "message": "--- Ciclo 9/10 ---"}
+{"timestamp": "2025-10-02 18:50:36,842", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:50:36,902", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: 'Introduction | tessdoc - Google Chrome'"}
+{"timestamp": "2025-10-02 18:50:36,903", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:50:36,955", "level": "INFO", "module": "agente", "function": "llm_call", "line": 152, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:50:41,359", "level": "INFO", "module": "agente", "function": "llm_call", "line": 165, "message": "Decisión recibida del modelo: {'accion': 'clic', 'params': {'x': 418, 'y': 172}, 'contexto': {'titulo_ventana_contiene': 'Introduction | tessdoc'}}"}
+{"timestamp": "2025-10-02 18:50:41,360", "level": "INFO", "module": "agente", "function": "actuar", "line": 178, "message": "--- Fase: Actuar (clic) ---"}
+{"timestamp": "2025-10-02 18:50:41,360", "level": "INFO", "module": "controlador", "function": "clic", "line": 55, "message": "Haciendo clic con botón left.", "extra_data": {"x": 418, "y": 172, "boton": "left"}}
+{"timestamp": "2025-10-02 18:50:43,471", "level": "INFO", "module": "agente", "function": "run", "line": 230, "message": "--- Ciclo 10/10 ---"}
+{"timestamp": "2025-10-02 18:50:43,471", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:50:43,543", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: 'Introduction | tessdoc - Google Chrome'"}
+{"timestamp": "2025-10-02 18:50:43,544", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:50:43,600", "level": "INFO", "module": "agente", "function": "llm_call", "line": 152, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:50:48,213", "level": "INFO", "module": "agente", "function": "llm_call", "line": 165, "message": "Decisión recibida del modelo: {'accion': 'clic', 'params': {'x': 312, 'y': 195}, 'contexto': {'titulo_ventana_contiene': 'Introduction | tessdoc'}}"}
+{"timestamp": "2025-10-02 18:50:48,213", "level": "INFO", "module": "agente", "function": "actuar", "line": 178, "message": "--- Fase: Actuar (clic) ---"}
+{"timestamp": "2025-10-02 18:50:48,214", "level": "INFO", "module": "controlador", "function": "clic", "line": 55, "message": "Haciendo clic con botón left.", "extra_data": {"x": 312, "y": 195, "boton": "left"}}
+{"timestamp": "2025-10-02 18:51:13,743", "level": "INFO", "module": "agente", "function": "__init__", "line": 22, "message": "Inicializando el agente InteractIA..."}
+{"timestamp": "2025-10-02 18:51:13,761", "level": "INFO", "module": "vision", "function": "__init__", "line": 45, "message": "Usando Tesseract desde la ruta: C:\\Program Files\\Tesseract-OCR\\tesseract.exe"}
+{"timestamp": "2025-10-02 18:51:22,678", "level": "INFO", "module": "agente", "function": "__init__", "line": 40, "message": "Modelo de IA configurado exitosamente."}
+{"timestamp": "2025-10-02 18:51:22,797", "level": "INFO", "module": "agente", "function": "establecer_objetivo", "line": 48, "message": "Objetivo establecido: Abre el Bloc de notas, escribe 'Hola, mundo!' y luego lee el contenido del Bloc de notas."}
+{"timestamp": "2025-10-02 18:51:22,798", "level": "INFO", "module": "agente", "function": "run", "line": 230, "message": "--- Ciclo 1/10 ---"}
+{"timestamp": "2025-10-02 18:51:22,798", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:51:22,871", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: 'Introduction | tessdoc - Google Chrome'"}
+{"timestamp": "2025-10-02 18:51:22,871", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:51:22,937", "level": "INFO", "module": "agente", "function": "llm_call", "line": 152, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:51:25,976", "level": "INFO", "module": "agente", "function": "llm_call", "line": 165, "message": "Decisión recibida del modelo: {'accion': 'abrir_app', 'params': {'app': 'notepad.exe'}, 'contexto': {'titulo_ventana_contiene': 'Introduction | tessdoc'}}"}
+{"timestamp": "2025-10-02 18:51:25,976", "level": "INFO", "module": "agente", "function": "actuar", "line": 178, "message": "--- Fase: Actuar (abrir_app) ---"}
+{"timestamp": "2025-10-02 18:51:25,976", "level": "INFO", "module": "controlador", "function": "abrir_aplicacion", "line": 38, "message": "Abriendo aplicación: 'notepad.exe'.", "extra_data": {"aplicacion": "notepad.exe"}}
+{"timestamp": "2025-10-02 18:51:26,036", "level": "INFO", "module": "controlador", "function": "esperar", "line": 51, "message": "Esperando 2 segundos.", "extra_data": {"segundos": 2}}
+{"timestamp": "2025-10-02 18:51:28,046", "level": "INFO", "module": "controlador", "function": "abrir_aplicacion", "line": 46, "message": "Ventana redimensionada y movida."}
+{"timestamp": "2025-10-02 18:51:30,047", "level": "INFO", "module": "agente", "function": "run", "line": 230, "message": "--- Ciclo 2/10 ---"}
+{"timestamp": "2025-10-02 18:51:30,047", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:51:30,122", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: 'Sin título: Bloc de notas'"}
+{"timestamp": "2025-10-02 18:51:30,124", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:51:30,177", "level": "INFO", "module": "agente", "function": "llm_call", "line": 152, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:51:34,232", "level": "INFO", "module": "agente", "function": "llm_call", "line": 165, "message": "Decisión recibida del modelo: {'accion': 'escribir', 'params': {'texto': 'Hola, mundo!'}, 'contexto': {'titulo_ventana_contiene': 'Bloc de notas'}}"}
+{"timestamp": "2025-10-02 18:51:34,233", "level": "INFO", "module": "agente", "function": "actuar", "line": 178, "message": "--- Fase: Actuar (escribir) ---"}
+{"timestamp": "2025-10-02 18:51:34,234", "level": "INFO", "module": "controlador", "function": "escribir", "line": 29, "message": "Escribiendo texto.", "extra_data": {"longitud": 12, "intervalo": 0.05}}
+{"timestamp": "2025-10-02 18:51:36,950", "level": "INFO", "module": "agente", "function": "run", "line": 230, "message": "--- Ciclo 3/10 ---"}
+{"timestamp": "2025-10-02 18:51:36,951", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:51:37,019", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: '*Sin título: Bloc de notas'"}
+{"timestamp": "2025-10-02 18:51:37,020", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:51:37,071", "level": "INFO", "module": "agente", "function": "llm_call", "line": 152, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:51:49,859", "level": "INFO", "module": "agente", "function": "llm_call", "line": 165, "message": "Decisión recibida del modelo: {'accion': 'presionar_tecla', 'params': {'tecla': 'ctrl+a'}, 'contexto': {'titulo_ventana_contiene': 'Bloc de notas'}}"}
+{"timestamp": "2025-10-02 18:51:49,859", "level": "INFO", "module": "agente", "function": "actuar", "line": 178, "message": "--- Fase: Actuar (presionar_tecla) ---"}
+{"timestamp": "2025-10-02 18:51:49,859", "level": "INFO", "module": "controlador", "function": "presionar_tecla", "line": 59, "message": "Presionando tecla: 'ctrl+a'.", "extra_data": {"tecla": "ctrl+a"}}
+{"timestamp": "2025-10-02 18:51:51,960", "level": "INFO", "module": "agente", "function": "run", "line": 230, "message": "--- Ciclo 4/10 ---"}
+{"timestamp": "2025-10-02 18:51:51,961", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:51:52,020", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: '*Sin título: Bloc de notas'"}
+{"timestamp": "2025-10-02 18:51:52,021", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:51:52,073", "level": "INFO", "module": "agente", "function": "llm_call", "line": 152, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:52:03,734", "level": "INFO", "module": "agente", "function": "llm_call", "line": 165, "message": "Decisión recibida del modelo: {'accion': 'finalizar', 'params': {'razón': \"El contenido 'Hola, mundo!' ha sido escrito y seleccionado en el Bloc de notas, completando el objetivo de lectura.\"}, 'contexto': {'titulo_ventana_contiene': 'Bloc de notas'}}"}
+{"timestamp": "2025-10-02 18:52:03,734", "level": "INFO", "module": "agente", "function": "actuar", "line": 178, "message": "--- Fase: Actuar (finalizar) ---"}
+{"timestamp": "2025-10-02 18:52:03,735", "level": "INFO", "module": "agente", "function": "run", "line": 235, "message": "Agente finalizando. Razón: Acción fallida o finalizada"}
+{"timestamp": "2025-10-02 18:53:22,675", "level": "INFO", "module": "agente", "function": "__init__", "line": 22, "message": "Inicializando el agente InteractIA..."}
+{"timestamp": "2025-10-02 18:53:22,691", "level": "INFO", "module": "vision", "function": "__init__", "line": 45, "message": "Usando Tesseract desde la ruta: C:\\Program Files\\Tesseract-OCR\\tesseract.exe"}
+{"timestamp": "2025-10-02 18:53:31,584", "level": "INFO", "module": "agente", "function": "__init__", "line": 40, "message": "Modelo de IA configurado exitosamente."}
+{"timestamp": "2025-10-02 18:53:31,694", "level": "INFO", "module": "agente", "function": "establecer_objetivo", "line": 48, "message": "Objetivo establecido: Abre el Bloc de notas, escribe 'Hola, mundo!' y luego utiliza la herramienta de OCR para leer el texto y guardarlo en el historial."}
+{"timestamp": "2025-10-02 18:53:31,694", "level": "INFO", "module": "agente", "function": "run", "line": 230, "message": "--- Ciclo 1/10 ---"}
+{"timestamp": "2025-10-02 18:53:31,695", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:53:31,753", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: '*Sin título: Bloc de notas'"}
+{"timestamp": "2025-10-02 18:53:31,753", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:53:31,802", "level": "INFO", "module": "agente", "function": "llm_call", "line": 152, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:53:52,735", "level": "INFO", "module": "agente", "function": "llm_call", "line": 165, "message": "Decisión recibida del modelo: {'accion': 'finalizar', 'params': {'razón': \"El texto 'Hola, mundo!' ha sido escrito en el Bloc de notas. Se espera que el sistema de InteractIA utilice la herramienta de OCR para leer el texto y guardarlo en el historial como el siguiente paso implícito del objetivo.\"}, 'contexto': {'titulo_ventana_contiene': 'Bloc de notas'}}"}
+{"timestamp": "2025-10-02 18:53:52,736", "level": "INFO", "module": "agente", "function": "actuar", "line": 178, "message": "--- Fase: Actuar (finalizar) ---"}
+{"timestamp": "2025-10-02 18:53:52,736", "level": "INFO", "module": "agente", "function": "run", "line": 235, "message": "Agente finalizando. Razón: Acción fallida o finalizada"}
+{"timestamp": "2025-10-02 18:54:45,636", "level": "INFO", "module": "agente", "function": "__init__", "line": 22, "message": "Inicializando el agente InteractIA..."}
+{"timestamp": "2025-10-02 18:54:45,656", "level": "INFO", "module": "vision", "function": "__init__", "line": 45, "message": "Usando Tesseract desde la ruta: C:\\Program Files\\Tesseract-OCR\\tesseract.exe"}
+{"timestamp": "2025-10-02 18:54:54,467", "level": "INFO", "module": "agente", "function": "__init__", "line": 40, "message": "Modelo de IA configurado exitosamente."}
+{"timestamp": "2025-10-02 18:54:54,563", "level": "INFO", "module": "agente", "function": "establecer_objetivo", "line": 48, "message": "Objetivo establecido: Abre el Bloc de notas, escribe 'Hola, mundo!' y luego utiliza la herramienta de OCR para leer el texto y guardarlo en el historial."}
+{"timestamp": "2025-10-02 18:54:54,564", "level": "INFO", "module": "agente", "function": "run", "line": 234, "message": "--- Ciclo 1/10 ---"}
+{"timestamp": "2025-10-02 18:54:54,564", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:54:54,636", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: '*Sin título: Bloc de notas'"}
+{"timestamp": "2025-10-02 18:54:54,637", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:54:54,683", "level": "INFO", "module": "agente", "function": "llm_call", "line": 152, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:55:13,875", "level": "INFO", "module": "agente", "function": "llm_call", "line": 165, "message": "Decisión recibida del modelo: {'accion': 'finalizar', 'params': {'razon': \"El Bloc de notas está abierto con el texto 'Hola, mundo!', listo para que la herramienta de OCR lea el contenido.\"}, 'contexto': {'titulo_ventana_contiene': 'Bloc de notas'}}"}
+{"timestamp": "2025-10-02 18:55:13,876", "level": "INFO", "module": "agente", "function": "actuar", "line": 178, "message": "--- Fase: Actuar (finalizar) ---"}
+{"timestamp": "2025-10-02 18:55:13,876", "level": "INFO", "module": "agente", "function": "run", "line": 239, "message": "Agente finalizando. Razón: El Bloc de notas está abierto con el texto 'Hola, mundo!', listo para que la herramienta de OCR lea el contenido."}
+{"timestamp": "2025-10-02 18:55:50,310", "level": "INFO", "module": "agente", "function": "__init__", "line": 22, "message": "Inicializando el agente InteractIA..."}
+{"timestamp": "2025-10-02 18:55:50,330", "level": "INFO", "module": "vision", "function": "__init__", "line": 45, "message": "Usando Tesseract desde la ruta: C:\\Program Files\\Tesseract-OCR\\tesseract.exe"}
+{"timestamp": "2025-10-02 18:55:59,214", "level": "INFO", "module": "agente", "function": "__init__", "line": 40, "message": "Modelo de IA configurado exitosamente."}
+{"timestamp": "2025-10-02 18:55:59,328", "level": "INFO", "module": "agente", "function": "establecer_objetivo", "line": 48, "message": "Objetivo establecido: Abre el Bloc de notas, escribe 'Hola, mundo!' y luego utiliza la herramienta de OCR para leer el texto y guardarlo en el historial."}
+{"timestamp": "2025-10-02 18:55:59,329", "level": "INFO", "module": "agente", "function": "run", "line": 236, "message": "--- Ciclo 1/10 ---"}
+{"timestamp": "2025-10-02 18:55:59,329", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:55:59,402", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: '*Sin título: Bloc de notas'"}
+{"timestamp": "2025-10-02 18:55:59,403", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:55:59,454", "level": "INFO", "module": "agente", "function": "llm_call", "line": 154, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:56:03,887", "level": "INFO", "module": "agente", "function": "llm_call", "line": 167, "message": "Decisión recibida del modelo: {'accion': 'leer_texto_ventana_activa', 'params': {}, 'contexto': {'titulo_ventana_contiene': 'Bloc de notas'}}"}
+{"timestamp": "2025-10-02 18:56:03,887", "level": "INFO", "module": "agente", "function": "actuar", "line": 180, "message": "--- Fase: Actuar (leer_texto_ventana_activa) ---"}
+{"timestamp": "2025-10-02 18:56:03,888", "level": "INFO", "module": "vision", "function": "leer_texto_ventana_activa", "line": 81, "message": "Leyendo texto de la ventana activa."}
+{"timestamp": "2025-10-02 18:56:03,925", "level": "ERROR", "module": "vision", "function": "leer_texto_ventana_activa", "line": 91, "message": "Error al leer el texto de la ventana activa: 'Vision' object has no attribute 'leer_texto_en_pantalla'"}
+{"timestamp": "2025-10-02 18:56:05,926", "level": "INFO", "module": "agente", "function": "run", "line": 236, "message": "--- Ciclo 2/10 ---"}
+{"timestamp": "2025-10-02 18:56:05,927", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:56:05,986", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: '*Sin título: Bloc de notas'"}
+{"timestamp": "2025-10-02 18:56:06,039", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:56:06,093", "level": "INFO", "module": "agente", "function": "llm_call", "line": 154, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:57:26,975", "level": "INFO", "module": "agente", "function": "__init__", "line": 22, "message": "Inicializando el agente InteractIA..."}
+{"timestamp": "2025-10-02 18:57:26,997", "level": "INFO", "module": "vision", "function": "__init__", "line": 45, "message": "Usando Tesseract desde la ruta: C:\\Program Files\\Tesseract-OCR\\tesseract.exe"}
+{"timestamp": "2025-10-02 18:57:35,871", "level": "INFO", "module": "agente", "function": "__init__", "line": 40, "message": "Modelo de IA configurado exitosamente."}
+{"timestamp": "2025-10-02 18:57:35,983", "level": "INFO", "module": "agente", "function": "establecer_objetivo", "line": 48, "message": "Objetivo establecido: Abre el Bloc de notas, escribe 'Hola, mundo!' y luego utiliza la herramienta de OCR para leer el texto y guardarlo en el historial."}
+{"timestamp": "2025-10-02 18:57:35,983", "level": "INFO", "module": "agente", "function": "run", "line": 236, "message": "--- Ciclo 1/10 ---"}
+{"timestamp": "2025-10-02 18:57:35,984", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:57:36,052", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: 'interactia.log - InteractIA - Visual Studio Code'"}
+{"timestamp": "2025-10-02 18:57:36,053", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:57:36,106", "level": "INFO", "module": "agente", "function": "llm_call", "line": 154, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:57:39,239", "level": "INFO", "module": "agente", "function": "llm_call", "line": 167, "message": "Decisión recibida del modelo: {'accion': 'abrir_app', 'params': {'app': 'notepad.exe'}, 'contexto': {'titulo_ventana_contiene': ''}}"}
+{"timestamp": "2025-10-02 18:57:39,240", "level": "INFO", "module": "agente", "function": "actuar", "line": 180, "message": "--- Fase: Actuar (abrir_app) ---"}
+{"timestamp": "2025-10-02 18:57:39,240", "level": "INFO", "module": "controlador", "function": "abrir_aplicacion", "line": 38, "message": "Abriendo aplicación: 'notepad.exe'.", "extra_data": {"aplicacion": "notepad.exe"}}
+{"timestamp": "2025-10-02 18:57:39,292", "level": "INFO", "module": "controlador", "function": "esperar", "line": 51, "message": "Esperando 2 segundos.", "extra_data": {"segundos": 2}}
+{"timestamp": "2025-10-02 18:57:41,304", "level": "INFO", "module": "controlador", "function": "abrir_aplicacion", "line": 46, "message": "Ventana redimensionada y movida."}
+{"timestamp": "2025-10-02 18:57:43,305", "level": "INFO", "module": "agente", "function": "run", "line": 236, "message": "--- Ciclo 2/10 ---"}
+{"timestamp": "2025-10-02 18:57:43,305", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:57:43,370", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: 'Sin título: Bloc de notas'"}
+{"timestamp": "2025-10-02 18:57:43,371", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:57:43,431", "level": "INFO", "module": "agente", "function": "llm_call", "line": 154, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:57:47,209", "level": "INFO", "module": "agente", "function": "llm_call", "line": 167, "message": "Decisión recibida del modelo: {'accion': 'escribir', 'params': {'texto': 'Hola, mundo!'}, 'contexto': {'titulo_ventana_contiene': 'Bloc de notas'}}"}
+{"timestamp": "2025-10-02 18:57:47,209", "level": "INFO", "module": "agente", "function": "actuar", "line": 180, "message": "--- Fase: Actuar (escribir) ---"}
+{"timestamp": "2025-10-02 18:57:47,209", "level": "INFO", "module": "controlador", "function": "escribir", "line": 29, "message": "Escribiendo texto.", "extra_data": {"longitud": 12, "intervalo": 0.05}}
+{"timestamp": "2025-10-02 18:57:49,925", "level": "INFO", "module": "agente", "function": "run", "line": 236, "message": "--- Ciclo 3/10 ---"}
+{"timestamp": "2025-10-02 18:57:49,926", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:57:49,986", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: '*Sin título: Bloc de notas'"}
+{"timestamp": "2025-10-02 18:57:49,987", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:57:50,041", "level": "INFO", "module": "agente", "function": "llm_call", "line": 154, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:57:53,168", "level": "INFO", "module": "agente", "function": "llm_call", "line": 167, "message": "Decisión recibida del modelo: {'accion': 'leer_texto_ventana_activa', 'params': {}, 'contexto': {'titulo_ventana_contiene': 'Bloc de notas'}}"}
+{"timestamp": "2025-10-02 18:57:53,168", "level": "INFO", "module": "agente", "function": "actuar", "line": 180, "message": "--- Fase: Actuar (leer_texto_ventana_activa) ---"}
+{"timestamp": "2025-10-02 18:57:53,169", "level": "INFO", "module": "vision", "function": "leer_texto_ventana_activa", "line": 81, "message": "Leyendo texto de la ventana activa."}
+{"timestamp": "2025-10-02 18:57:53,203", "level": "ERROR", "module": "vision", "function": "leer_texto_ventana_activa", "line": 91, "message": "Error al leer el texto de la ventana activa: 'Vision' object has no attribute 'leer_texto_en_pantalla'"}
+{"timestamp": "2025-10-02 18:57:55,204", "level": "INFO", "module": "agente", "function": "run", "line": 236, "message": "--- Ciclo 4/10 ---"}
+{"timestamp": "2025-10-02 18:57:55,204", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:57:55,274", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: '*Sin título: Bloc de notas'"}
+{"timestamp": "2025-10-02 18:57:55,275", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:57:55,325", "level": "INFO", "module": "agente", "function": "llm_call", "line": 154, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:58:10,542", "level": "INFO", "module": "agente", "function": "llm_call", "line": 167, "message": "Decisión recibida del modelo: {'accion': 'leer_texto_ventana_activa', 'params': {}, 'contexto': {'titulo_ventana_contiene': 'Bloc de notas'}}"}
+{"timestamp": "2025-10-02 18:58:10,542", "level": "INFO", "module": "agente", "function": "actuar", "line": 180, "message": "--- Fase: Actuar (leer_texto_ventana_activa) ---"}
+{"timestamp": "2025-10-02 18:58:10,542", "level": "INFO", "module": "vision", "function": "leer_texto_ventana_activa", "line": 81, "message": "Leyendo texto de la ventana activa."}
+{"timestamp": "2025-10-02 18:58:10,572", "level": "ERROR", "module": "vision", "function": "leer_texto_ventana_activa", "line": 91, "message": "Error al leer el texto de la ventana activa: 'Vision' object has no attribute 'leer_texto_en_pantalla'"}
+{"timestamp": "2025-10-02 18:58:12,573", "level": "INFO", "module": "agente", "function": "run", "line": 236, "message": "--- Ciclo 5/10 ---"}
+{"timestamp": "2025-10-02 18:58:12,574", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:58:12,636", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: '*Sin título: Bloc de notas'"}
+{"timestamp": "2025-10-02 18:58:12,638", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:58:12,687", "level": "INFO", "module": "agente", "function": "llm_call", "line": 154, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:58:30,689", "level": "INFO", "module": "agente", "function": "llm_call", "line": 167, "message": "Decisión recibida del modelo: {'accion': 'leer_texto_ventana_activa', 'params': {}, 'contexto': {'titulo_ventana_contiene': 'Bloc de notas'}}"}
+{"timestamp": "2025-10-02 18:58:30,691", "level": "INFO", "module": "agente", "function": "actuar", "line": 180, "message": "--- Fase: Actuar (leer_texto_ventana_activa) ---"}
+{"timestamp": "2025-10-02 18:58:30,693", "level": "INFO", "module": "vision", "function": "leer_texto_ventana_activa", "line": 81, "message": "Leyendo texto de la ventana activa."}
+{"timestamp": "2025-10-02 18:58:30,721", "level": "ERROR", "module": "vision", "function": "leer_texto_ventana_activa", "line": 91, "message": "Error al leer el texto de la ventana activa: 'Vision' object has no attribute 'leer_texto_en_pantalla'"}
+{"timestamp": "2025-10-02 18:58:32,722", "level": "INFO", "module": "agente", "function": "run", "line": 236, "message": "--- Ciclo 6/10 ---"}
+{"timestamp": "2025-10-02 18:58:32,723", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:58:32,787", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: 'Bloc de notas'"}
+{"timestamp": "2025-10-02 18:58:32,789", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:58:32,839", "level": "INFO", "module": "agente", "function": "llm_call", "line": 154, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:58:46,920", "level": "INFO", "module": "agente", "function": "llm_call", "line": 167, "message": "Decisión recibida del modelo: {'accion': 'clic', 'params': {'x': 590, 'y': 240}, 'contexto': {'titulo_ventana_contiene': 'Bloc de notas'}}"}
+{"timestamp": "2025-10-02 18:58:46,920", "level": "INFO", "module": "agente", "function": "actuar", "line": 180, "message": "--- Fase: Actuar (clic) ---"}
+{"timestamp": "2025-10-02 18:58:46,921", "level": "INFO", "module": "controlador", "function": "clic", "line": 55, "message": "Haciendo clic con botón left.", "extra_data": {"x": 590, "y": 240, "boton": "left"}}
+{"timestamp": "2025-10-02 18:58:49,043", "level": "INFO", "module": "agente", "function": "run", "line": 236, "message": "--- Ciclo 7/10 ---"}
+{"timestamp": "2025-10-02 18:58:49,043", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:58:49,104", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: '*Sin título: Bloc de notas'"}
+{"timestamp": "2025-10-02 18:58:49,105", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:58:49,155", "level": "INFO", "module": "agente", "function": "llm_call", "line": 154, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:58:58,230", "level": "INFO", "module": "agente", "function": "llm_call", "line": 167, "message": "Decisión recibida del modelo: {'accion': 'leer_texto_ventana_activa', 'params': {}, 'contexto': {'titulo_ventana_contiene': 'Bloc de notas'}}"}
+{"timestamp": "2025-10-02 18:58:58,230", "level": "INFO", "module": "agente", "function": "actuar", "line": 180, "message": "--- Fase: Actuar (leer_texto_ventana_activa) ---"}
+{"timestamp": "2025-10-02 18:58:58,230", "level": "INFO", "module": "vision", "function": "leer_texto_ventana_activa", "line": 81, "message": "Leyendo texto de la ventana activa."}
+{"timestamp": "2025-10-02 18:58:58,278", "level": "ERROR", "module": "vision", "function": "leer_texto_ventana_activa", "line": 91, "message": "Error al leer el texto de la ventana activa: 'Vision' object has no attribute 'leer_texto_en_pantalla'"}
+{"timestamp": "2025-10-02 18:59:00,279", "level": "INFO", "module": "agente", "function": "run", "line": 236, "message": "--- Ciclo 8/10 ---"}
+{"timestamp": "2025-10-02 18:59:00,279", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:59:00,385", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: '*Sin título: Bloc de notas'"}
+{"timestamp": "2025-10-02 18:59:00,386", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:59:00,436", "level": "INFO", "module": "agente", "function": "llm_call", "line": 154, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:59:05,942", "level": "INFO", "module": "agente", "function": "llm_call", "line": 167, "message": "Decisión recibida del modelo: {'accion': 'leer_texto_ventana_activa', 'params': {}, 'contexto': {'titulo_ventana_contiene': 'Bloc de notas'}}"}
+{"timestamp": "2025-10-02 18:59:05,943", "level": "INFO", "module": "agente", "function": "actuar", "line": 180, "message": "--- Fase: Actuar (leer_texto_ventana_activa) ---"}
+{"timestamp": "2025-10-02 18:59:05,943", "level": "INFO", "module": "vision", "function": "leer_texto_ventana_activa", "line": 81, "message": "Leyendo texto de la ventana activa."}
+{"timestamp": "2025-10-02 18:59:05,972", "level": "ERROR", "module": "vision", "function": "leer_texto_ventana_activa", "line": 91, "message": "Error al leer el texto de la ventana activa: 'Vision' object has no attribute 'leer_texto_en_pantalla'"}
+{"timestamp": "2025-10-02 18:59:07,973", "level": "INFO", "module": "agente", "function": "run", "line": 236, "message": "--- Ciclo 9/10 ---"}
+{"timestamp": "2025-10-02 18:59:07,973", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:59:08,041", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: '*Sin título: Bloc de notas'"}
+{"timestamp": "2025-10-02 18:59:08,042", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:59:08,091", "level": "INFO", "module": "agente", "function": "llm_call", "line": 154, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:59:14,885", "level": "INFO", "module": "agente", "function": "llm_call", "line": 167, "message": "Decisión recibida del modelo: {'accion': 'leer_texto_ventana_activa', 'params': {}, 'contexto': {'titulo_ventana_contiene': 'Bloc de notas'}}"}
+{"timestamp": "2025-10-02 18:59:14,886", "level": "INFO", "module": "agente", "function": "actuar", "line": 180, "message": "--- Fase: Actuar (leer_texto_ventana_activa) ---"}
+{"timestamp": "2025-10-02 18:59:14,886", "level": "INFO", "module": "vision", "function": "leer_texto_ventana_activa", "line": 81, "message": "Leyendo texto de la ventana activa."}
+{"timestamp": "2025-10-02 18:59:14,926", "level": "ERROR", "module": "vision", "function": "leer_texto_ventana_activa", "line": 91, "message": "Error al leer el texto de la ventana activa: 'Vision' object has no attribute 'leer_texto_en_pantalla'"}
+{"timestamp": "2025-10-02 18:59:16,927", "level": "INFO", "module": "agente", "function": "run", "line": 236, "message": "--- Ciclo 10/10 ---"}
+{"timestamp": "2025-10-02 18:59:16,927", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 18:59:16,985", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: '*Sin título: Bloc de notas'"}
+{"timestamp": "2025-10-02 18:59:16,986", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 18:59:17,035", "level": "INFO", "module": "agente", "function": "llm_call", "line": 154, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 18:59:23,074", "level": "INFO", "module": "agente", "function": "llm_call", "line": 167, "message": "Decisión recibida del modelo: {'accion': 'leer_texto_ventana_activa', 'params': {}, 'contexto': {'titulo_ventana_contiene': 'Bloc de notas'}}"}
+{"timestamp": "2025-10-02 18:59:23,074", "level": "INFO", "module": "agente", "function": "actuar", "line": 180, "message": "--- Fase: Actuar (leer_texto_ventana_activa) ---"}
+{"timestamp": "2025-10-02 18:59:23,074", "level": "INFO", "module": "vision", "function": "leer_texto_ventana_activa", "line": 81, "message": "Leyendo texto de la ventana activa."}
+{"timestamp": "2025-10-02 18:59:23,112", "level": "ERROR", "module": "vision", "function": "leer_texto_ventana_activa", "line": 91, "message": "Error al leer el texto de la ventana activa: 'Vision' object has no attribute 'leer_texto_en_pantalla'"}
+{"timestamp": "2025-10-02 19:00:11,100", "level": "INFO", "module": "agente", "function": "__init__", "line": 22, "message": "Inicializando el agente InteractIA..."}
+{"timestamp": "2025-10-02 19:00:11,119", "level": "INFO", "module": "vision", "function": "__init__", "line": 45, "message": "Usando Tesseract desde la ruta: C:\\Program Files\\Tesseract-OCR\\tesseract.exe"}
+{"timestamp": "2025-10-02 19:00:19,950", "level": "INFO", "module": "agente", "function": "__init__", "line": 40, "message": "Modelo de IA configurado exitosamente."}
+{"timestamp": "2025-10-02 19:00:20,061", "level": "INFO", "module": "agente", "function": "establecer_objetivo", "line": 48, "message": "Objetivo establecido: Abre el Bloc de notas, escribe 'Hola, mundo!' y luego utiliza la herramienta de OCR para leer el texto y guardarlo en el historial."}
+{"timestamp": "2025-10-02 19:00:20,061", "level": "INFO", "module": "agente", "function": "run", "line": 236, "message": "--- Ciclo 1/10 ---"}
+{"timestamp": "2025-10-02 19:00:20,061", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 19:00:20,125", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: '*Sin título: Bloc de notas'"}
+{"timestamp": "2025-10-02 19:00:20,125", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 19:00:20,170", "level": "INFO", "module": "agente", "function": "llm_call", "line": 154, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 19:00:25,917", "level": "INFO", "module": "agente", "function": "llm_call", "line": 167, "message": "Decisión recibida del modelo: {'accion': 'leer_texto_ventana_activa', 'params': {}, 'contexto': {'titulo_ventana_contiene': 'Bloc de notas'}}"}
+{"timestamp": "2025-10-02 19:00:25,917", "level": "INFO", "module": "agente", "function": "actuar", "line": 180, "message": "--- Fase: Actuar (leer_texto_ventana_activa) ---"}
+{"timestamp": "2025-10-02 19:00:25,917", "level": "INFO", "module": "vision", "function": "leer_texto_ventana_activa", "line": 81, "message": "Leyendo texto de la ventana activa."}
+{"timestamp": "2025-10-02 19:00:25,953", "level": "ERROR", "module": "vision", "function": "leer_texto_ventana_activa", "line": 91, "message": "Error al leer el texto de la ventana activa: 'Vision' object has no attribute 'leer_texto_en_pantalla'"}
+{"timestamp": "2025-10-02 19:00:27,954", "level": "INFO", "module": "agente", "function": "run", "line": 236, "message": "--- Ciclo 2/10 ---"}
+{"timestamp": "2025-10-02 19:00:27,954", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 19:00:28,019", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: '*Sin título: Bloc de notas'"}
+{"timestamp": "2025-10-02 19:00:28,020", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 19:00:28,062", "level": "INFO", "module": "agente", "function": "llm_call", "line": 154, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 19:00:32,587", "level": "INFO", "module": "agente", "function": "llm_call", "line": 167, "message": "Decisión recibida del modelo: {'accion': 'leer_texto_ventana_activa', 'params': {}, 'contexto': {'titulo_ventana_contiene': 'Bloc de notas'}}"}
+{"timestamp": "2025-10-02 19:00:32,587", "level": "INFO", "module": "agente", "function": "actuar", "line": 180, "message": "--- Fase: Actuar (leer_texto_ventana_activa) ---"}
+{"timestamp": "2025-10-02 19:00:32,587", "level": "INFO", "module": "vision", "function": "leer_texto_ventana_activa", "line": 81, "message": "Leyendo texto de la ventana activa."}
+{"timestamp": "2025-10-02 19:00:32,626", "level": "ERROR", "module": "vision", "function": "leer_texto_ventana_activa", "line": 91, "message": "Error al leer el texto de la ventana activa: 'Vision' object has no attribute 'leer_texto_en_pantalla'"}
+{"timestamp": "2025-10-02 19:00:34,627", "level": "INFO", "module": "agente", "function": "run", "line": 236, "message": "--- Ciclo 3/10 ---"}
+{"timestamp": "2025-10-02 19:00:34,627", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 19:00:34,689", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: '*Sin título: Bloc de notas'"}
+{"timestamp": "2025-10-02 19:00:34,690", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 19:00:34,735", "level": "INFO", "module": "agente", "function": "llm_call", "line": 154, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 19:00:40,950", "level": "INFO", "module": "agente", "function": "llm_call", "line": 167, "message": "Decisión recibida del modelo: {'accion': 'leer_texto_ventana_activa', 'params': {}, 'contexto': {'titulo_ventana_contiene': 'Bloc de notas'}}"}
+{"timestamp": "2025-10-02 19:00:40,950", "level": "INFO", "module": "agente", "function": "actuar", "line": 180, "message": "--- Fase: Actuar (leer_texto_ventana_activa) ---"}
+{"timestamp": "2025-10-02 19:00:40,950", "level": "INFO", "module": "vision", "function": "leer_texto_ventana_activa", "line": 81, "message": "Leyendo texto de la ventana activa."}
+{"timestamp": "2025-10-02 19:00:40,992", "level": "ERROR", "module": "vision", "function": "leer_texto_ventana_activa", "line": 91, "message": "Error al leer el texto de la ventana activa: 'Vision' object has no attribute 'leer_texto_en_pantalla'"}
+{"timestamp": "2025-10-02 19:00:42,993", "level": "INFO", "module": "agente", "function": "run", "line": 236, "message": "--- Ciclo 4/10 ---"}
+{"timestamp": "2025-10-02 19:00:42,994", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 19:00:43,051", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: '*Sin título: Bloc de notas'"}
+{"timestamp": "2025-10-02 19:00:43,052", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 19:00:43,096", "level": "INFO", "module": "agente", "function": "llm_call", "line": 154, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 19:00:48,089", "level": "INFO", "module": "agente", "function": "llm_call", "line": 167, "message": "Decisión recibida del modelo: {'accion': 'leer_texto_ventana_activa', 'params': {}, 'contexto': {'titulo_ventana_contiene': 'Bloc de notas'}}"}
+{"timestamp": "2025-10-02 19:00:48,089", "level": "INFO", "module": "agente", "function": "actuar", "line": 180, "message": "--- Fase: Actuar (leer_texto_ventana_activa) ---"}
+{"timestamp": "2025-10-02 19:00:48,090", "level": "INFO", "module": "vision", "function": "leer_texto_ventana_activa", "line": 81, "message": "Leyendo texto de la ventana activa."}
+{"timestamp": "2025-10-02 19:00:48,120", "level": "ERROR", "module": "vision", "function": "leer_texto_ventana_activa", "line": 91, "message": "Error al leer el texto de la ventana activa: 'Vision' object has no attribute 'leer_texto_en_pantalla'"}
+{"timestamp": "2025-10-02 19:00:50,120", "level": "INFO", "module": "agente", "function": "run", "line": 236, "message": "--- Ciclo 5/10 ---"}
+{"timestamp": "2025-10-02 19:00:50,121", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 19:00:50,178", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: '*Sin título: Bloc de notas'"}
+{"timestamp": "2025-10-02 19:00:50,179", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 19:00:50,267", "level": "INFO", "module": "agente", "function": "llm_call", "line": 154, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 19:00:56,870", "level": "INFO", "module": "agente", "function": "llm_call", "line": 167, "message": "Decisión recibida del modelo: {'accion': 'leer_texto_ventana_activa', 'params': {}, 'contexto': {'titulo_ventana_contiene': 'Bloc de notas'}}"}
+{"timestamp": "2025-10-02 19:00:56,871", "level": "INFO", "module": "agente", "function": "actuar", "line": 180, "message": "--- Fase: Actuar (leer_texto_ventana_activa) ---"}
+{"timestamp": "2025-10-02 19:00:56,871", "level": "INFO", "module": "vision", "function": "leer_texto_ventana_activa", "line": 81, "message": "Leyendo texto de la ventana activa."}
+{"timestamp": "2025-10-02 19:00:56,904", "level": "ERROR", "module": "vision", "function": "leer_texto_ventana_activa", "line": 91, "message": "Error al leer el texto de la ventana activa: 'Vision' object has no attribute 'leer_texto_en_pantalla'"}
+{"timestamp": "2025-10-02 19:00:58,905", "level": "INFO", "module": "agente", "function": "run", "line": 236, "message": "--- Ciclo 6/10 ---"}
+{"timestamp": "2025-10-02 19:00:58,906", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 19:00:58,972", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: '*Sin título: Bloc de notas'"}
+{"timestamp": "2025-10-02 19:00:58,973", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 19:00:59,019", "level": "INFO", "module": "agente", "function": "llm_call", "line": 154, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 19:01:04,960", "level": "INFO", "module": "agente", "function": "llm_call", "line": 167, "message": "Decisión recibida del modelo: {'accion': 'leer_texto_ventana_activa', 'params': {}, 'contexto': {'titulo_ventana_contiene': 'Bloc de notas'}}"}
+{"timestamp": "2025-10-02 19:01:04,960", "level": "INFO", "module": "agente", "function": "actuar", "line": 180, "message": "--- Fase: Actuar (leer_texto_ventana_activa) ---"}
+{"timestamp": "2025-10-02 19:01:04,961", "level": "INFO", "module": "vision", "function": "leer_texto_ventana_activa", "line": 81, "message": "Leyendo texto de la ventana activa."}
+{"timestamp": "2025-10-02 19:01:04,990", "level": "ERROR", "module": "vision", "function": "leer_texto_ventana_activa", "line": 91, "message": "Error al leer el texto de la ventana activa: 'Vision' object has no attribute 'leer_texto_en_pantalla'"}
+{"timestamp": "2025-10-02 19:01:06,991", "level": "INFO", "module": "agente", "function": "run", "line": 236, "message": "--- Ciclo 7/10 ---"}
+{"timestamp": "2025-10-02 19:01:06,992", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 19:01:07,052", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: '*Sin título: Bloc de notas'"}
+{"timestamp": "2025-10-02 19:01:07,054", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 19:01:07,149", "level": "INFO", "module": "agente", "function": "llm_call", "line": 154, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 19:01:11,984", "level": "INFO", "module": "agente", "function": "llm_call", "line": 167, "message": "Decisión recibida del modelo: {'accion': 'leer_texto_ventana_activa', 'params': {}, 'contexto': {'titulo_ventana_contiene': 'Bloc de notas'}}"}
+{"timestamp": "2025-10-02 19:01:11,985", "level": "INFO", "module": "agente", "function": "actuar", "line": 180, "message": "--- Fase: Actuar (leer_texto_ventana_activa) ---"}
+{"timestamp": "2025-10-02 19:01:11,986", "level": "INFO", "module": "vision", "function": "leer_texto_ventana_activa", "line": 81, "message": "Leyendo texto de la ventana activa."}
+{"timestamp": "2025-10-02 19:01:12,020", "level": "ERROR", "module": "vision", "function": "leer_texto_ventana_activa", "line": 91, "message": "Error al leer el texto de la ventana activa: 'Vision' object has no attribute 'leer_texto_en_pantalla'"}
+{"timestamp": "2025-10-02 19:01:14,021", "level": "INFO", "module": "agente", "function": "run", "line": 236, "message": "--- Ciclo 8/10 ---"}
+{"timestamp": "2025-10-02 19:01:14,022", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 19:01:14,092", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: '*Sin título: Bloc de notas'"}
+{"timestamp": "2025-10-02 19:01:14,094", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 19:01:14,179", "level": "INFO", "module": "agente", "function": "llm_call", "line": 154, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 19:01:19,084", "level": "INFO", "module": "agente", "function": "llm_call", "line": 167, "message": "Decisión recibida del modelo: {'accion': 'leer_texto_ventana_activa', 'params': {}, 'contexto': {'titulo_ventana_contiene': 'Bloc de notas'}}"}
+{"timestamp": "2025-10-02 19:01:19,084", "level": "INFO", "module": "agente", "function": "actuar", "line": 180, "message": "--- Fase: Actuar (leer_texto_ventana_activa) ---"}
+{"timestamp": "2025-10-02 19:01:19,084", "level": "INFO", "module": "vision", "function": "leer_texto_ventana_activa", "line": 81, "message": "Leyendo texto de la ventana activa."}
+{"timestamp": "2025-10-02 19:01:19,120", "level": "ERROR", "module": "vision", "function": "leer_texto_ventana_activa", "line": 91, "message": "Error al leer el texto de la ventana activa: 'Vision' object has no attribute 'leer_texto_en_pantalla'"}
+{"timestamp": "2025-10-02 19:01:21,120", "level": "INFO", "module": "agente", "function": "run", "line": 236, "message": "--- Ciclo 9/10 ---"}
+{"timestamp": "2025-10-02 19:01:21,121", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 19:01:21,186", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: '*Sin título: Bloc de notas'"}
+{"timestamp": "2025-10-02 19:01:21,187", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 19:01:21,235", "level": "INFO", "module": "agente", "function": "llm_call", "line": 154, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 19:01:24,967", "level": "INFO", "module": "agente", "function": "llm_call", "line": 167, "message": "Decisión recibida del modelo: {'accion': 'leer_texto_ventana_activa', 'params': {}, 'contexto': {'titulo_ventana_contiene': 'Bloc de notas'}}"}
+{"timestamp": "2025-10-02 19:01:24,968", "level": "INFO", "module": "agente", "function": "actuar", "line": 180, "message": "--- Fase: Actuar (leer_texto_ventana_activa) ---"}
+{"timestamp": "2025-10-02 19:01:24,968", "level": "INFO", "module": "vision", "function": "leer_texto_ventana_activa", "line": 81, "message": "Leyendo texto de la ventana activa."}
+{"timestamp": "2025-10-02 19:01:25,010", "level": "ERROR", "module": "vision", "function": "leer_texto_ventana_activa", "line": 91, "message": "Error al leer el texto de la ventana activa: 'Vision' object has no attribute 'leer_texto_en_pantalla'"}
+{"timestamp": "2025-10-02 19:01:27,011", "level": "INFO", "module": "agente", "function": "run", "line": 236, "message": "--- Ciclo 10/10 ---"}
+{"timestamp": "2025-10-02 19:01:27,011", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 19:01:27,093", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: '*Sin título: Bloc de notas'"}
+{"timestamp": "2025-10-02 19:01:27,094", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 19:01:27,138", "level": "INFO", "module": "agente", "function": "llm_call", "line": 154, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 19:01:31,137", "level": "INFO", "module": "agente", "function": "llm_call", "line": 167, "message": "Decisión recibida del modelo: {'accion': 'leer_texto_ventana_activa', 'params': {}, 'contexto': {'titulo_ventana_contiene': 'Bloc de notas'}}"}
+{"timestamp": "2025-10-02 19:01:31,137", "level": "INFO", "module": "agente", "function": "actuar", "line": 180, "message": "--- Fase: Actuar (leer_texto_ventana_activa) ---"}
+{"timestamp": "2025-10-02 19:01:31,138", "level": "INFO", "module": "vision", "function": "leer_texto_ventana_activa", "line": 81, "message": "Leyendo texto de la ventana activa."}
+{"timestamp": "2025-10-02 19:01:31,170", "level": "ERROR", "module": "vision", "function": "leer_texto_ventana_activa", "line": 91, "message": "Error al leer el texto de la ventana activa: 'Vision' object has no attribute 'leer_texto_en_pantalla'"}
+{"timestamp": "2025-10-02 19:02:20,171", "level": "INFO", "module": "agente", "function": "__init__", "line": 22, "message": "Inicializando el agente InteractIA..."}
+{"timestamp": "2025-10-02 19:02:20,189", "level": "INFO", "module": "vision", "function": "__init__", "line": 45, "message": "Usando Tesseract desde la ruta: C:\\Program Files\\Tesseract-OCR\\tesseract.exe"}
+{"timestamp": "2025-10-02 19:02:29,132", "level": "INFO", "module": "agente", "function": "__init__", "line": 40, "message": "Modelo de IA configurado exitosamente."}
+{"timestamp": "2025-10-02 19:02:29,253", "level": "INFO", "module": "agente", "function": "establecer_objetivo", "line": 48, "message": "Objetivo establecido: Abre el Bloc de notas, escribe 'Hola, mundo!' y luego utiliza la herramienta de OCR para leer el texto y guardarlo en el historial."}
+{"timestamp": "2025-10-02 19:02:29,253", "level": "INFO", "module": "agente", "function": "run", "line": 236, "message": "--- Ciclo 1/10 ---"}
+{"timestamp": "2025-10-02 19:02:29,254", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 19:02:29,322", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: '*Sin título: Bloc de notas'"}
+{"timestamp": "2025-10-02 19:02:29,323", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 19:02:29,379", "level": "INFO", "module": "agente", "function": "llm_call", "line": 154, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 19:02:33,915", "level": "INFO", "module": "agente", "function": "llm_call", "line": 167, "message": "Decisión recibida del modelo: {'accion': 'leer_texto_ventana_activa', 'params': {}, 'contexto': {'titulo_ventana_contiene': 'Bloc de notas'}}"}
+{"timestamp": "2025-10-02 19:02:33,916", "level": "INFO", "module": "agente", "function": "actuar", "line": 180, "message": "--- Fase: Actuar (leer_texto_ventana_activa) ---"}
+{"timestamp": "2025-10-02 19:02:33,917", "level": "INFO", "module": "vision", "function": "leer_texto_ventana_activa", "line": 123, "message": "Leyendo texto de la ventana activa."}
+{"timestamp": "2025-10-02 19:02:33,954", "level": "INFO", "module": "vision", "function": "leer_texto_en_pantalla", "line": 84, "message": "Realizando OCR para leer texto en la imagen."}
+{"timestamp": "2025-10-02 19:02:35,263", "level": "INFO", "module": "vision", "function": "leer_texto_en_pantalla", "line": 107, "message": "OCR completado. Se encontraron 18 bloques de texto con confianza > 60%."}
+{"timestamp": "2025-10-02 19:02:37,266", "level": "INFO", "module": "agente", "function": "run", "line": 236, "message": "--- Ciclo 2/10 ---"}
+{"timestamp": "2025-10-02 19:02:37,267", "level": "INFO", "module": "agente", "function": "observar", "line": 51, "message": "--- Fase: Observar ---"}
+{"timestamp": "2025-10-02 19:02:37,341", "level": "INFO", "module": "vision", "function": "capturar_pantalla", "line": 62, "message": "Capturada la ventana: '*Sin título: Bloc de notas'"}
+{"timestamp": "2025-10-02 19:02:37,342", "level": "INFO", "module": "agente", "function": "pensar", "line": 57, "message": "--- Fase: Pensar ---"}
+{"timestamp": "2025-10-02 19:02:37,395", "level": "INFO", "module": "agente", "function": "llm_call", "line": 154, "message": "Enviando petición al modelo de IA..."}
+{"timestamp": "2025-10-02 19:02:42,730", "level": "INFO", "module": "agente", "function": "llm_call", "line": 167, "message": "Decisión recibida del modelo: {'accion': 'finalizar', 'params': {'razón': \"El Bloc de notas está abierto, 'Hola, mundo!' ha sido escrito y el texto ha sido leído por OCR y guardado en el historial, completando el objetivo.\"}}"}
+{"timestamp": "2025-10-02 19:02:42,731", "level": "INFO", "module": "agente", "function": "actuar", "line": 180, "message": "--- Fase: Actuar (finalizar) ---"}
+{"timestamp": "2025-10-02 19:02:42,731", "level": "INFO", "module": "agente", "function": "run", "line": 241, "message": "Agente finalizando. Razón: Acción fallida o finalizada"}
