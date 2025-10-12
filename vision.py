@@ -1,8 +1,9 @@
 import pyautogui
-from PIL import Image
+from PIL import Image, ImageDraw
 import logging
 import pytesseract
 import subprocess
+import os
 
 def buscar_tesseract():
     """
@@ -10,25 +11,16 @@ def buscar_tesseract():
     Devuelve la ruta completa si lo encuentra, de lo contrario None.
     """
     print("Buscando Tesseract OCR...")
-    comandos = [
-        'dir "C:\\Program Files\\Tesseract-OCR\\tesseract.exe" /s /b',
-        'dir "C:\\Program Files (x86)\\Tesseract-OCR\\tesseract.exe" /s /b'
+    rutas_comunes = [
+        "C:\\Program Files\\Tesseract-OCR\\tesseract.exe",
+        "C:\\Program Files (x86)\\Tesseract-OCR\\tesseract.exe"
     ]
 
-    for cmd in comandos:
-        try:
-            print(f"Ejecutando: {cmd}")
-            resultado = subprocess.check_output(cmd, shell=True, stderr=subprocess.DEVNULL, text=True).strip()
-            if resultado and resultado.endswith("tesseract.exe"):
-                print(f"(+) Tesseract encontrado en: {resultado}")
-                return resultado
-        except subprocess.CalledProcessError:
-            # El comando falla si no encuentra el archivo, lo cual es esperado.
-            continue
-        except Exception as e:
-            print(f"(-) Ocurrió un error inesperado al ejecutar el comando: {e}")
-            continue
-            
+    for ruta in rutas_comunes:
+        if os.path.exists(ruta):
+            print(f"(+) Tesseract encontrado en: {ruta}")
+            return ruta
+
     print("(-) Tesseract no se encontró en las rutas de instalación comunes.")
     return None
 
@@ -48,24 +40,46 @@ class Vision:
         except Exception as e:
             self.logger.error(f"Error al configurar Pytesseract. Asegúrate de que Tesseract está instalado. Error: {e}", exc_info=True)
 
-    def capturar_pantalla(self, titulo_ventana=None):
-        self.logger.debug("Capturando pantalla.")
+    def capturar_entorno(self, id_ventana_propia=None):
+        """Captura la pantalla completa y opcionalmente oculta la ventana propia del agente."""
+        self.logger.debug("Capturando el entorno.")
         captura_completa = pyautogui.screenshot()
-        captura_ventana = None
 
-        if titulo_ventana:
+        if id_ventana_propia:
             try:
-                ventanas = pyautogui.getWindowsWithTitle(titulo_ventana)
+                ventanas = pyautogui.getWindowsWithTitle(id_ventana_propia)
                 if ventanas:
-                    ventana = ventanas[0]
-                    captura_ventana = pyautogui.screenshot(region=(ventana.left, ventana.top, ventana.width, ventana.height))
-                    self.logger.info(f"Capturada la ventana: '{titulo_ventana}'")
+                    ventana_propia = ventanas[0]
+                    draw = ImageDraw.Draw(captura_completa)
+                    # Dibuja un rectángulo negro sobre la ventana propia
+                    draw.rectangle(
+                        (ventana_propia.left, ventana_propia.top, ventana_propia.right, ventana_propia.bottom),
+                        fill='black'
+                    )
+                    self.logger.info(f"Ocultada la ventana propia: '{id_ventana_propia}'")
                 else:
-                    self.logger.warning(f"No se encontró ninguna ventana con el título: '{titulo_ventana}'")
+                    self.logger.warning(f"No se encontró la ventana propia para ocultar: '{id_ventana_propia}'")
             except Exception as e:
-                self.logger.error(f"Error al capturar la ventana '{titulo_ventana}': {e}")
+                self.logger.error(f"Error al ocultar la ventana propia '{id_ventana_propia}': {e}")
 
-        return captura_completa, captura_ventana
+        return captura_completa
+
+    def capturar_ventana_objetivo(self, titulo_objetivo):
+        """Captura únicamente la región de una ventana objetivo específica."""
+        self.logger.debug(f"Intentando capturar la ventana objetivo: {titulo_objetivo}")
+        try:
+            ventanas = pyautogui.getWindowsWithTitle(titulo_objetivo)
+            if ventanas:
+                ventana = ventanas[0]
+                captura_ventana = pyautogui.screenshot(region=(ventana.left, ventana.top, ventana.width, ventana.height))
+                self.logger.info(f"Capturada la ventana objetivo: '{titulo_objetivo}'")
+                return captura_ventana
+            else:
+                self.logger.warning(f"No se encontró ninguna ventana con el título: '{titulo_objetivo}'")
+                return None
+        except Exception as e:
+            self.logger.error(f"Error al capturar la ventana '{titulo_objetivo}': {e}")
+            return None
 
     def guardar_imagen(self, imagen: Image.Image, nombre_archivo: str):
         self.logger.info(f"Guardando imagen en '{nombre_archivo}'.", extra={'extra_data': {'archivo': nombre_archivo}})

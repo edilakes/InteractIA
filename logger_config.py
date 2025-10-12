@@ -21,34 +21,29 @@ class JsonFormatter(logging.Formatter):
         
         return json.dumps(log_record, ensure_ascii=False)
 
-def setup_logging(log_level=logging.INFO):
+def setup_logging(log_level=logging.DEBUG):
     """
     Configura el sistema de logging para todo el proyecto.
     """
     logger = logging.getLogger("InteractIA")
     logger.setLevel(log_level)
 
-    # Evitar que se añadan manejadores duplicados si se llama a esta función varias veces
     if logger.hasHandlers():
         logger.handlers.clear()
 
-    # Crear un manejador que rota los logs, para que no crezcan indefinidamente
-    # 1MB por archivo, manteniendo 3 archivos de backup.
-    handler = RotatingFileHandler("interactia.log", maxBytes=1024*1024, backupCount=3, encoding='utf-8')
-    
-    # Crear el formateador JSON y añadirlo al manejador
-    formatter = JsonFormatter()
-    handler.setFormatter(formatter)
-    
-    # Añadir el manejador al logger
-    logger.addHandler(handler)
+    # File handler for detailed DEBUG logs in JSON format
+    file_handler = RotatingFileHandler("interactia_debug.log", maxBytes=1024*1024, backupCount=3, encoding='utf-8')
+    file_handler.setLevel(logging.DEBUG) # Ensure file handler captures DEBUG
+    json_formatter = JsonFormatter()
+    file_handler.setFormatter(json_formatter)
+    logger.addHandler(file_handler)
 
-    # Opcional: Añadir un manejador para la consola para ver los logs en tiempo real (con formato simple)
+    # Console handler for general INFO logs with a simple format
     console_handler = logging.StreamHandler()
-    console_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-    console_handler.setFormatter(console_formatter)
-    # No añadir el handler de consola para no duplicar la salida que ya tenemos
-    # logger.addHandler(console_handler)
+    console_handler.setLevel(logging.INFO) # Console shows INFO and above
+    simple_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    console_handler.setFormatter(simple_formatter)
+    logger.addHandler(console_handler)
 
 if __name__ == '__main__':
     # Configurar el logging

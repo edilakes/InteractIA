@@ -29,7 +29,7 @@ class KnowledgeBase:
             print(f"(-) ERROR al inicializar KnowledgeBase: {e}")
             self.client = None # Asegurarse de que no se use un cliente inválido
 
-    def guardar_habilidad(self, nombre_recurso, tipo_recurso, datos_habilidad):
+    def aprender_habilidad(self, nombre_recurso, tipo_recurso, datos_habilidad):
         """
         Guarda o actualiza una habilidad en la base de datos.
 
@@ -66,7 +66,7 @@ class KnowledgeBase:
             print(f"(+) La habilidad '{nombre_recurso}' ya estaba actualizada.")
             return self.collection.find_one({"nombre_recurso": nombre_recurso})["_id"]
 
-    def consultar_habilidad(self, nombre_recurso):
+    def conocer_habilidad(self, nombre_recurso):
         """
         Busca y devuelve una habilidad por su nombre.
 
@@ -95,6 +95,19 @@ class KnowledgeBase:
             
         return list(self.collection.find({}, {'_id': 0}))
 
+    def olvidar_habilidad(self, nombre_recurso):
+        """Elimina una habilidad de la base de datos por su nombre."""
+        if not self.client:
+            print("(-) No se puede olvidar la habilidad, no hay conexión con la base de datos.")
+            return None
+        
+        resultado = self.collection.delete_one({"nombre_recurso": nombre_recurso})
+        if resultado.deleted_count > 0:
+            print(f"(+) Habilidad '{nombre_recurso}' olvidada exitosamente.")
+        else:
+            print(f"(-) No se encontró la habilidad '{nombre_recurso}' para olvidar.")
+        return resultado
+
 if __name__ == '__main__':
     print("--- Probando el módulo KnowledgeBase ---")
     kb = KnowledgeBase()
@@ -108,22 +121,22 @@ if __name__ == '__main__':
             "ejemplo": "GET /v1/items"
         }
 
-        # 1. Guardar la habilidad
-        kb.guardar_habilidad(nombre_test, "API", datos_test)
+        # 1. Aprender la habilidad
+        kb.aprender_habilidad(nombre_test, "API", datos_test)
 
-        # 2. Consultar la habilidad
-        habilidad_guardada = kb.consultar_habilidad(nombre_test)
+        # 2. Conocer la habilidad
+        habilidad_conocida = kb.conocer_habilidad(nombre_test)
         
-        if habilidad_guardada:
-            print("\n(+) Habilidad consultada:")
-            print(habilidad_guardada)
-            assert habilidad_guardada["datos"]["endpoint"] == "https://api_prueba.com/v1"
+        if habilidad_conocida:
+            print("\n(+) Habilidad conocida:")
+            print(habilidad_conocida)
+            assert habilidad_conocida["datos"]["endpoint"] == "https://api_prueba.com/v1"
             print("\n(+) La aserción de datos fue exitosa.")
         else:
-            print("(-) ERROR: No se pudo consultar la habilidad guardada.")
+            print("(-) ERROR: No se pudo conocer la habilidad aprendida.")
 
-        # 3. Limpiar la base de datos
-        kb.eliminar_habilidad(nombre_test)
+        # 3. Olvidar la habilidad
+        kb.olvidar_habilidad(nombre_test)
         print("\n--- Prueba completada ---")
     else:
         print("\n--- Prueba abortada por fallo de conexión ---")

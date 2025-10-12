@@ -12,6 +12,23 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 # URI de conexión para la base de datos MongoDB
 MONGO_URI = os.getenv("MONGO_URI")
 
+# --- Configuración de la Base de Datos ---
+
+# Nombre de la base de datos principal
+MONGODB_DATABASE_NAME = "interactia_db"
+
+# Nombre de la colección para el historial de chat
+MONGODB_CHAT_COLLECTION = "chat_history"
+
+# Nombre de la colección para las oportunidades de aprendizaje descubiertas
+MONGODB_OPORTUNIDADES_COLLECTION = "oportunidades_aprendizaje"
+
+# Nombre de la colección para registrar sesiones de chat ya analizadas
+MONGODB_SESIONES_ANALIZADAS_COLLECTION = "sesiones_analizadas"
+
+# Número de mensajes a recuperar del historial de chat
+CHAT_HISTORY_LENGTH = 20
+
 # --- Configuraciones del Agente ---
 
 # Modelo de Gemini a utilizar para la toma de decisiones

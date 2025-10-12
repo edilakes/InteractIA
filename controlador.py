@@ -34,19 +34,6 @@ class Controlador:
         pyautogui.screenshot(nombre_archivo)
         return nombre_archivo
 
-    def abrir_aplicacion(self, ruta_aplicacion):
-        self.logger.info(f"Abriendo aplicación: '{ruta_aplicacion}'.", extra={'extra_data': {'aplicacion': ruta_aplicacion}})
-        os.startfile(ruta_aplicacion)
-        self.esperar(2) # Esperar a que la ventana aparezca
-        try:
-            ventana = pyautogui.getActiveWindow()
-            if ventana:
-                ventana.resizeTo(1024, 768)
-                ventana.moveTo(0, 0)
-                self.logger.info(f"Ventana redimensionada y movida.")
-        except Exception as e:
-            self.logger.warning(f"No se pudo redimensionar la ventana: {e}")
-
     def esperar(self, segundos):
         self.logger.info(f"Esperando {segundos} segundos.", extra={'extra_data': {'segundos': segundos}})
         time.sleep(segundos)
@@ -58,6 +45,14 @@ class Controlador:
     def presionar_tecla(self, tecla):
         self.logger.info(f"Presionando tecla: '{tecla}'.", extra={'extra_data': {'tecla': tecla}})
         pyautogui.press(tecla)
+
+    def mantener_tecla(self, tecla):
+        self.logger.info(f"Manteniendo pulsada la tecla: '{tecla}'.", extra={'extra_data': {'tecla': tecla}})
+        pyautogui.keyDown(tecla)
+
+    def soltar_tecla(self, tecla):
+        self.logger.info(f"Soltando la tecla: '{tecla}'.", extra={'extra_data': {'tecla': tecla}})
+        pyautogui.keyUp(tecla)
 
     def scroll(self, direccion, clics):
         self.logger.info(f"Haciendo scroll hacia {direccion} ({clics} clics).", extra={'extra_data': {'direccion': direccion, 'clics': clics}})
@@ -118,7 +113,7 @@ if __name__ == '__main__':
     main_logger.info("--- Iniciando prueba del Controlador --- ")
     controlador = Controlador()
 
-    controlador.abrir_aplicacion('notepad.exe')
+    # controlador.abrir_aplicacion('notepad.exe') # This is now deprecated
     controlador.esperar(2)
     controlador.escribir("Prueba de logging en el controlador.")
     controlador.esperar(1)

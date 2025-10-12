@@ -2,7 +2,7 @@ import time
 import json
 import google.generativeai as genai
 from PIL import Image
-import pyautogui # Importar para obtener la ventana activa
+import pyautogui
 import logging
 
 # Módulos de la aplicación
@@ -10,30 +10,35 @@ import config
 from controlador import Controlador
 from vision import Vision
 from knowledge_base import KnowledgeBase
+from memoria_chat_mongodb import MongoDBChatMemory
 from logger_config import setup_logging
+from comunicador import Comunicador
+import lock_manager
 
 class Agente:
     """
     El agente principal que orquesta los módulos de percepción, decisión y acción.
     """
-    def __init__(self):
+    def __init__(self, id_ventana=None, id_objetivo=None, callback_hablar=None, callback_finalizar=None):
         setup_logging()
         self.logger = logging.getLogger("InteractIA")
-        self.logger.info("Inicializando el agente InteractIA...")
-        # --- Cargar configuración y verificar ---
+        self.logger.info(f"Inicializando el agente InteractIA (ID: {id_ventana})...")
+        
+        self.mi_id_ventana = id_ventana
+        self.modo = 'autonomo'
+        self.titulo_objetivo = None
+
+        if id_objetivo:
+            self.modo = 'controlador'
+            self.titulo_objetivo = f"interactia-{id_objetivo}"
+            self.logger.info(f"Agente en modo 'controlador'. Objetivo: {self.titulo_objetivo}")
+
         if not config.verificar_configuracion():
             self.operativo = False
             self.logger.error("El agente no puede operar debido a una configuración faltante.")
             return
-        
-        # --- Inicializar módulos ---
-        self.controlador = Controlador()
-        self.vision = Vision()
-        self.kb = KnowledgeBase()
-        self.objetivo = None
-        self.historial_acciones = []
 
-        # --- Configurar el modelo de IA ---
+        # 1. Inicializar el modelo de IA primero
         try:
             genai.configure(api_key=config.GEMINI_API_KEY)
             self.modelo = genai.GenerativeModel(config.GEMINI_MODEL_NAME)
@@ -42,235 +47,464 @@ class Agente:
         except Exception as e:
             self.logger.error(f"ERROR al configurar el modelo de IA: {e}")
             self.operativo = False
+            return
+
+        # 2. Inicializar los módulos principales, pasando el modelo a la memoria
+        self.controlador = Controlador()
+        self.vision = Vision()
+        self.kb = KnowledgeBase()
+        self.memoria = MongoDBChatMemory(modelo=self.modelo)
+        self.comunicador = Comunicador(callback_hablar, callback_finalizar)
+        
+        self.objetivo = None
+        self.historial_acciones = []
+        
+        # 3. Cargar el historial de conversación desde la base de datos al iniciar
+        historial_complejo = self.memoria._recuperar_historial_crudo(
+            session_key=self.mi_id_ventana
+        ) if self.memoria.operativo else []
+        self.historial_conversacion = self.memoria.convertir_historial_a_formato_simple(historial_complejo)
+        
+        self.estado_agente = {}
+
+        # 4. Cargar habilidades fundamentales
+        self.habilidades_fundamentales = self.kb.conocer_habilidad('habilidades_fundamentales_agente')
+        if not self.habilidades_fundamentales:
+            self.logger.critical("¡ERROR CRÍTICO! No se pudieron cargar las habilidades fundamentales del agente desde la KB.")
+            self.operativo = False
+            return
+        else:
+            self.logger.info("Habilidades fundamentales del agente cargadas correctamente desde la KB.")
 
     def establecer_objetivo(self, objetivo):
+        # Comprobar si es un comando interno para el agente
+        if objetivo.strip().lower() == '/aprender_de_historial':
+            self.logger.info("Comando de meta-aprendizaje recibido. Iniciando ciclo...")
+            # Iniciar el ciclo en un nuevo hilo para no bloquear la GUI
+            import threading
+            threading.Thread(target=self.iniciar_ciclo_meta_aprendizaje).start()
+            return
+
         self.objetivo = objetivo
-        self.logger.info(f"Objetivo establecido: {self.objetivo}")
+        # El historial de acciones se reinicia, pero el de conversación persiste en la sesión
+        if not self.estado_agente.get('esperando_aprobacion'):
+            self.historial_acciones = []
+
+        # Guardar en la base de datos y luego añadir a la lista local
+        rol = 'usuario'
+        contenido = {'texto': objetivo, 'adjunto': None} # Estructura para futuros adjuntos
+        self.memoria.guardar_mensaje(self.mi_id_ventana, rol, contenido)
+        self.historial_conversacion.append({'rol': rol, 'contenido': objetivo})
+
+        self.logger.info(f"Objetivo establecido y guardado en memoria: {self.objetivo}")
 
     def observar(self):
         self.logger.info("--- Fase: Observar ---")
-        titulo_ventana = pyautogui.getActiveWindowTitle()
-        captura_completa, captura_ventana = self.vision.capturar_pantalla(titulo_ventana)
-        return captura_completa, captura_ventana
+        return self.vision.capturar_entorno(id_ventana_propia=self.mi_id_ventana), None
 
-    def pensar(self, captura_completa: Image.Image, captura_ventana: Image.Image):
+    def pensar(self, captura_entorno: Image.Image, captura_objetivo: Image.Image):
         self.logger.info("--- Fase: Pensar ---")
         if not self.objetivo:
-            return {"tipo": "finalizar", "razon": "No hay objetivo"}
+            return {"accion": "finalizar", "params": {"razon": "No hay objetivo"}}
 
-        # Consultar base de conocimiento (ejemplo simple)
-        # En un caso real, se buscarían palabras clave del objetivo
-        habilidad_conocida = self.kb.consultar_habilidad(self.objetivo)
+        # Comprobar si estamos esperando la aprobación de una habilidad de meta-aprendizaje
+        if self.estado_agente.get('esperando_aprobacion_meta'):
+            oportunidad = self.estado_agente.get('oportunidad_en_revision')
+            self.estado_agente = {} # Limpiar estado
 
-        prompt = self._construir_prompt(habilidad_conocida)
+            if self.objetivo.lower().strip() in ['sí', 'si', 's', 'ok', 'vale']:
+                self.logger.info(f"Aprobación de hipótesis recibida para la oportunidad {oportunidad['oportunidad_id']}")
+                self.memoria.actualizar_estado_oportunidad(oportunidad['oportunidad_id'], 'verificacion_exitosa')
+                return {"accion": "hablar", "params": {"mensaje": "¡Genial! He validado esa habilidad. La procesaré más adelante para formalizarla."}}
+            else:
+                self.logger.info(f"Rechazo de hipótesis para la oportunidad {oportunidad['oportunidad_id']}")
+                self.memoria.actualizar_estado_oportunidad(oportunidad['oportunidad_id'], 'rechazada_por_usuario')
+                return {"accion": "hablar", "params": {"mensaje": "Entendido. Descarto esa habilidad potencial."}}
+
+        if self.estado_agente.get('esperando_aprobacion'):
+            return self._manejar_aprobacion_aprendizaje()
+
+        # 1. Obtener contexto resumiendo la memoria
+        resumen_memoria = self.memoria.resumir_y_consultar(session_key=self.mi_id_ventana)
+
+        # 2. Buscar conocimiento relevante en la KB
+        habilidad_conocida = self.kb.conocer_habilidad(self.objetivo)
+
+        # 3. Construir el prompt con el contexto de memoria y KB
+        prompt = self._construir_prompt(resumen_memoria=resumen_memoria, habilidad=habilidad_conocida)
         
-        return self.llm_call(prompt, captura_completa, captura_ventana)
+        self.logger.debug(f"--- PROMPT PARA EL MODELO ---\n{prompt}")
+        return self.llm_call(prompt, captura_entorno, captura_objetivo)
 
-    def _construir_prompt(self, habilidad=None):
-        # Base del prompt
+    def _manejar_aprobacion_aprendizaje(self):
+        habilidad_destilada = self.estado_agente.get('habilidad_destilada')
+        self.estado_agente = {} # Limpiar estado
+
+        if self.objetivo.lower().strip() in ['sí', 'si', 's', 'ok', 'vale']:
+            self.logger.info(f"Aprobación de aprendizaje recibida para la habilidad: {habilidad_destilada['nombre_habilidad']}")
+            
+            datos_habilidad = habilidad_destilada
+            datos_habilidad['origen'] = 'conversacion_usuario_destilado'
+            datos_habilidad['validado'] = False
+
+            self.kb.aprender_habilidad(
+                nombre_recurso=habilidad_destilada['nombre_habilidad'],
+                tipo_recurso='Usuario Destilado',
+                datos_habilidad=datos_habilidad
+            )
+            mensaje = f"Entendido. He aprendido la nueva habilidad '{habilidad_destilada['nombre_habilidad']}'."
+            
+            # Guardar en la base de datos y luego añadir a la lista local
+            rol = 'agente'
+            contenido = {'texto': mensaje, 'adjunto': None}
+            self.memoria.guardar_mensaje(self.mi_id_ventana, rol, contenido)
+            self.historial_conversacion.append({'rol': rol, 'contenido': mensaje})
+
+            return {"accion": "hablar", "params": {"mensaje": mensaje}}
+        else:
+            self.logger.info("El usuario ha rechazado la propuesta de aprendizaje.")
+            mensaje = "De acuerdo, no guardaré la habilidad. ¿Cuál es la siguiente tarea?"
+            
+            # Guardar en la base de datos y luego añadir a la lista local
+            rol = 'agente'
+            contenido = {'texto': mensaje, 'adjunto': None}
+            self.memoria.guardar_mensaje(self.mi_id_ventana, rol, contenido)
+            self.historial_conversacion.append({'rol': rol, 'contenido': mensaje})
+
+            return {"accion": "hablar", "params": {"mensaje": mensaje}}
+
+    def _construir_prompt(self, resumen_memoria: str, habilidad=None, es_modo_controlador=False):
+        acciones_disponibles_str = ""
+        if self.habilidades_fundamentales and 'datos' in self.habilidades_fundamentales and 'acciones' in self.habilidades_fundamentales['datos']:
+            for accion in self.habilidades_fundamentales['datos']['acciones']:
+                acciones_disponibles_str += f"- `{accion['nombre']}`: {accion.get('params', '{}')} ({accion.get('descripcion', '')})\n"
+
+        contexto_habilidad = f"CONTEXTO DE CONOCIMIENTO PREVIO:\n{json.dumps(habilidad['datos'], indent=2, ensure_ascii=False)}" if habilidad else ""
+
         prompt_base = f"""
-        Tu eres InteractIA, un agente de IA que controla un ordenador para cumplir un objetivo.
-        Tu objetivo actual es: '{self.objetivo}'.
-        
-        Analiza las dos capturas de pantalla que se te proporcionan y decide la SIGUIENTE acción atómica y precisa a realizar para avanzar en el plan.
-        Se te proporcionan dos imágenes:
-        1.  **Captura de la ventana activa:** Esta es la vista principal y más importante, donde debes enfocar tu acción.
-        2.  **Captura de la pantalla completa:** Úsala como contexto para entender la situación general si es necesario.
+Tu rol es InteractIA, un agente de IA que completa tareas controlando un ordenador.
 
-        Las acciones posibles son:
-        - clic(x, y)
-        - escribir(\"texto\")
-        - abrir_app(\"app\")
-        - presionar_tecla(\"tecla\") # ej. \"enter\", \"esc\"
-        - scroll(\"direccion\", clics) #direccion puede ser 'arriba' o 'abajo'
-        - arrastrar_barra(\"direccion\", porcentaje) # direccion puede ser 'vertical' o 'horizontal'
-        - esperar(segundos)
-        - finalizar(\"razón\")
-        
-        Devuelve tu decisión en formato JSON. Los parámetros de la acción deben estar anidados en un diccionario 'params'.
-        Ejemplos de formato:
-        - Para un clic: {{'accion': 'clic', 'params': {{'x': 120, 'y': 340}}}}
-        - Para escribir: {{'accion': 'escribir', 'params': {{'texto': 'hola mundo'}}}}
-        - Para abrir una app: {{'accion': 'abrir_app', 'params': {{'app': 'chrome.exe'}}}}
-        - Para presionar Enter: {{'accion': 'presionar_tecla', 'params': {{'tecla': 'enter'}}}}
-        - Para hacer scroll: {{'accion': 'scroll', 'params': {{'direccion': 'abajo', 'clics': 10}}}}
-        - Para arrastrar la barra: {{'accion': 'arrastrar_barra', 'params': {{'direccion': 'vertical', 'porcentaje': 50}}}}
-        
-        Al usar `abrir_app`, asegúrate de incluir la extensión del programa (ej. `chrome.exe`).
-        """
+OBJETIVO ACTUAL: '{self.objetivo}'
 
-        # Construir el historial como una cadena de texto
-        historial_str = "\n".join(map(str, self.historial_acciones[-5:])) if self.historial_acciones else "Ninguna"
+CONTEXTO DE MEMORIA RELEVANTE:
+{resumen_memoria}
 
-        prompt_base = f"""
-        Tu rol es InteractIA, un agente de IA que controla un ordenador.
-        
-        OBJETIVO ACTUAL: '{self.objetivo}'
-        
-        HISTORIAL DE ACCIONES RECIENTES (qué has hecho ya):
-        {historial_str}
-        
-        PROCESO DE DECISIÓN:
-        1.  **Tu única función es decidir la siguiente acción a tomar. Eres el único responsable de progresar en el objetivo. No asumas que nada ocurrirá si no lo ordenas explícitamente.**
-        2.  **Antes de cada acción, asegúrate de que la ventana activa es la que esperas. Si no lo es, no realices ninguna acción y finaliza la tarea.**
-        3.  **Antes de realizar cualquier acción, comprueba si la aplicación necesaria está abierta. Si no lo está, tu primera acción debe ser abrirla.**
-        4.  **Cuando navegues a una URL, primero escribe la URL en la barra de direcciones, luego presiona 'enter' y espera a que la página se cargue completamente antes de realizar cualquier otra acción.**
-        5.  **Recuerda que las ventanas pueden tener contenido que no se ve. Si no encuentras lo que buscas, puedes usar la acción `scroll` para desplazarte hacia arriba o hacia abajo. Para desplazamientos grandes y rápidos, es más eficiente usar `arrastrar_barra`. Observa la barra de desplazamiento para estimar cuánto contenido queda.**
-        6.  **Para leer el contenido de una ventana, DEBES usar la acción `leer_texto_ventana_activa`. Esta es la única forma que tienes de saber qué texto hay en la pantalla. No des por hecho que el texto está leído hasta que no hayas usado esta acción y veas el resultado en el historial.**
-        7.  Analiza el objetivo y el historial para determinar el siguiente paso lógico en el plan.
-        8.  **Usa las dos capturas de pantalla para tomar tu decisión:**
-            *   **Imagen 1 (Ventana Activa):** Enfócate en esta imagen para realizar acciones precisas como hacer clic o escribir.
-            *   **Imagen 2 (Pantalla Completa):** Úsala para entender el contexto general si la ventana activa no es suficiente.
-        9.  Devuelve ÚNICAMENTE la siguiente acción atómica en formato JSON, incluyendo el contexto esperado.
-        
-        ACCIONES DISPONIBLES:
-        - clic(x, y)
-        - escribir(\"texto\")
-        - abrir_app(\"app\")
-        - presionar_tecla(\"tecla\") # ej. \"enter\", \"esc\"
-        - scroll(\"direccion\", clics) # Para desplazamientos finos
-        - arrastrar_barra(\"direccion\", porcentaje) # Para desplazamientos grandes y rápidos. direccion: 'vertical' o 'horizontal', porcentaje: 0-100
-        - finalizar(\"razón\")
-        
-        FORMATO DE RESPUESTA JSON:
-        ```json
-        {{
-            "accion": "nombre_de_la_accion",
-            "params": {{ "app": "valor" }},
-            "contexto": {{ "titulo_ventana_contiene": "Parte del título de la ventana esperada" }}
-        }}
-        ```
-        
-        Ejemplo de razonamiento (no lo incluyas en la respuesta):
-        - Objetivo: 'Abrir Notepad y escribir hola'. Historial: [abrir_app(notepad.exe)]. Pantalla: Notepad abierto.
-        - Pensamiento: Notepad ya está abierto. El siguiente paso es escribir 'hola'. La ventana activa debe ser 'Notepad'.
-        - Respuesta: {{'accion': 'escribir', 'params': {{'texto': 'hola'}}, 'contexto': {{'titulo_ventana_contiene': 'Notepad'}}}} 
-        
-        Ahora, proporciona la siguiente acción para tu objetivo actual.
-        """;
-        return prompt_base
+{contexto_habilidad}
 
-    def llm_call(self, prompt: str, captura_completa: Image.Image, captura_ventana: Image.Image):
+TAREA PRINCIPAL:
+Tu deber es analizar el objetivo y el contexto de memoria para crear un plan de acción. Luego, determina el siguiente paso atómico para avanzar en ese plan.
+1.  **Analiza y Planifica**: Observa la pantalla y el contexto. Si no tienes un plan, créalo ahora.
+2.  **Decide la Próxima Acción**: Basado en tu plan y la imagen, elige la siguiente acción.
+3.  **Pide Aclaración si es Necesario**: Si te falta información, usa `pedir_aclaracion` para hacer una pregunta específica.
+4.  **Reflexiona y Propón Aprendizaje**: Si finalizas una tarea con éxito y crees que el procedimiento es nuevo y reutilizable, tu acción final DEBE ser `proponer_aprendizaje`.
+
+HABILIDADES FUNDAMENTALES (Tus herramientas):
+{acciones_disponibles_str}
+RESPUESTA (ÚNICAMENTE JSON):
+"""
+        if es_modo_controlador:
+            prompt_context = f"""MODO DE OPERACIÓN: Controlador..."""
+        else:
+            prompt_context = f"""MODO DE OPERACIÓN: Autónomo..."""
+        
+        return prompt_base + prompt_context
+
+    def llm_call(self, prompt: str, captura_entorno: Image.Image, captura_objetivo: Image.Image):
         self.logger.info("Enviando petición al modelo de IA...")
         try:
-            contenido = [prompt]
-            if captura_ventana:
-                contenido.append(captura_ventana)
-            contenido.append(captura_completa)
-
+            contenido = [prompt, captura_entorno]
             respuesta = self.modelo.generate_content(contenido)
-            
-            # Limpiar y parsear la respuesta JSON
+            self.logger.debug(f"Respuesta cruda del modelo: {respuesta.text}")
+
             json_text = respuesta.text.strip().replace('```json', '').replace('```', '')
             decision = json.loads(json_text)
+
+            if not isinstance(decision, dict) or 'accion' not in decision:
+                for key, value in decision.items():
+                    if key in [a['nombre'] for a in self.habilidades_fundamentales['datos']['acciones']]:
+                        self.logger.warning(f"Respuesta JSON mal formada detectada. Auto-corrigiendo a formato estándar.")
+                        decision = {"accion": key, "params": value}
+                        break
             
             self.logger.info(f"Decisión recibida del modelo: {decision}")
             return decision
         except Exception as e:
             self.logger.error(f"ERROR al llamar al modelo de IA o parsear su respuesta: {e}")
-            # En caso de error, intentar imprimir el feedback del prompt si está disponible
-            if 'respuesta' in locals() and hasattr(respuesta, 'prompt_feedback'):
-                self.logger.error(f"Contexto del Error (Feedback del Prompt): {respuesta.prompt_feedback}")
             return {"accion": "finalizar", "params": {"razon": "Error en el módulo de decisión"}}
 
     def actuar(self, decision: dict):
         accion = decision.get("accion")
         params = decision.get("params", {})
-        contexto = decision.get("contexto")
         self.logger.info(f"--- Fase: Actuar ({accion}) ---")
 
-        # --- GUARDIÁN DE SEGURIDAD ---
-        if accion != "abrir_app" and contexto and "titulo_ventana_contiene" in contexto:
-            titulo_esperado = contexto["titulo_ventana_contiene"]
-            ventana_activa = pyautogui.getActiveWindowTitle()
-            
-            # Comprobación más flexible del título
-            palabras_esperadas = set(titulo_esperado.lower().split())
-            palabras_activas = set(ventana_activa.lower().split())
-
-            if not palabras_esperadas.issubset(palabras_activas):
-                error_msg = f"¡ERROR DE SEGURIDAD! La acción '{accion}' fue abortada. Ventana esperada: '{titulo_esperado}', Ventana activa: '{ventana_activa}'"
-                self.logger.error(error_msg)
-                return False # Detener el bucle por seguridad
-
+        lock_manager.acquire_lock(self.mi_id_ventana)
         try:
-            if accion == "clic":
-                self.controlador.clic(params['x'], params['y'])
+            if accion == "proponer_aprendizaje":
+                self._destilar_y_proponer_habilidad()
+                return 'DETENER_Y_ESPERAR'
+            elif accion in ["pedir_aclaracion", "hablar"]:
+                mensaje = ""
+                if isinstance(params, dict):
+                    mensaje = params.get('pregunta', params.get('mensaje', 'No sé qué decir.'))
+                else:
+                    mensaje = params
+                self.comunicador.hablar(mensaje)
+                
+                # Guardar en la base de datos y luego añadir a la lista local
+                rol = 'agente'
+                contenido = {'texto': mensaje, 'adjunto': None}
+                self.memoria.guardar_mensaje(self.mi_id_ventana, rol, contenido)
+                self.historial_conversacion.append({'rol': rol, 'contenido': mensaje})
+
+                self.comunicador.finalizar_habla()
+                return 'DETENER_Y_ESPERAR'
+            elif accion == "clic":
+                ancho, alto = pyautogui.size()
+                x_abs = int(params['x_rel'] * ancho)
+                y_abs = int(params['y_rel'] * alto)
+                self.controlador.clic(x_abs, y_abs)
             elif accion == "escribir":
-                self.controlador.escribir(params['texto'])
-            elif accion == "abrir_app":
-                self.controlador.abrir_aplicacion(params['app'])
+                texto = params['texto'] if isinstance(params, dict) else params
+                self.controlador.escribir(texto)
             elif accion == "presionar_tecla":
-                self.controlador.presionar_tecla(params['tecla'])
+                tecla = params['tecla'] if isinstance(params, dict) else params
+                self.controlador.presionar_tecla(tecla)
             elif accion == "scroll":
                 self.controlador.scroll(params['direccion'], params['clics'])
             elif accion == "arrastrar_barra":
                 self.controlador.arrastrar_barra(params['direccion'], params['porcentaje'])
-            elif accion == "leer_texto_ventana_activa":
-                texto_leido = self.vision.leer_texto_ventana_activa()
-                self.historial_acciones.append({"accion": "leer_texto_ventana_activa", "resultado": texto_leido})
+            elif accion == "cambiar_ventana":
+                self.controlador.mantener_tecla('alt')
+                tabs = params.get('tabs', 1) if isinstance(params, dict) else 1
+                for _ in range(tabs):
+                    self.controlador.presionar_tecla('tab')
+                    self.controlador.esperar(0.2)
+                self.controlador.soltar_tecla('alt')
             elif accion == "esperar":
-                self.controlador.esperar(params['segundos'])
+                segundos = params['segundos'] if isinstance(params, dict) else params
+                self.controlador.esperar(segundos)
             elif accion == "finalizar":
-                return False # Indicar al bucle que debe terminar
+                razon = params.get('razon', 'Razón no especificada') if isinstance(params, dict) else params
+                self.logger.info(f"Finalizando por decisión del modelo. Razón: {razon}")
+                return 'FINALIZAR'
             else:
-                self.logger.warning(f"Acción desconocida: {accion}")
+                pregunta = f"La acción '{accion}' no es válida o no sé cómo interpretarla. ¿Podrías darme una instrucción más simple?"
+                self.logger.warning(f"Acción desconocida o no manejada: {accion}. Pidiendo aclaración.")
+                self.comunicador.hablar(pregunta)
+                
+                # Guardar en la base de datos y luego añadir a la lista local
+                rol = 'agente'
+                contenido = {'texto': pregunta, 'adjunto': None}
+                self.memoria.guardar_mensaje(self.mi_id_ventana, rol, contenido)
+                self.historial_conversacion.append({'rol': rol, 'contenido': pregunta})
+
+                self.comunicador.finalizar_habla()
+                return 'DETENER_Y_ESPERAR'
             
-            if accion != "leer_texto_ventana_activa":
-                self.historial_acciones.append(decision) # Guardar acción exitosa
-            return True # Indicar al bucle que continúe
+            self.historial_acciones.append(decision)
+            return 'CONTINUAR'
+
         except Exception as e:
             self.logger.error(f"ERROR al ejecutar la acción '{accion}': {e}")
-            return False # Terminar en caso de error
+            return 'FINALIZAR'
+        finally:
+            lock_manager.release_lock(self.mi_id_ventana)
 
-    def run(self):
-        if not self.operativo:
-            self.logger.error("El agente no es operativo. Revisa la configuración y los errores.")
-            return
+    def _destilar_y_proponer_habilidad(self):
+        self.logger.info("Iniciando el proceso de destilación de conocimiento.")
+        historial_str = "\n".join([f"{msg['rol']}: {msg['contenido']}" for msg in self.historial_conversacion])
+        
+        prompt_destilacion = f"""
+        Analiza el siguiente historial de conversación donde un usuario enseñó a un agente a completar una tarea.
+        Extrae el objetivo principal y resume los pasos en una habilidad estructurada y reutilizable.
 
-        if not self.objetivo:
-            self.logger.error("Error: No se ha establecido un objetivo.")
-            return
+        HISTORIAL DE CONVERSACIÓN:
+        {historial_str}
 
-        for i in range(10): # Límite de 10 ciclos para seguridad
-            self.logger.info(f"--- Ciclo {i+1}/10 ---")
-            captura_completa, captura_ventana = self.observar()
-            decision = self.pensar(captura_completa, captura_ventana)
+        TAREA:
+        Responde ÚNICAMENTE con un JSON que siga esta estructura:
+        {{
+          "nombre_habilidad": "<un_nombre_corto_y_descriptivo_en_snake_case>",
+          "descripcion": "<Una descripción clara de lo que hace la habilidad. >",
+          "pasos": [
+            {{ "accion": "<nombre_de_la_accion>", "params": {{ "<nombre_param>": "<valor_param>" }} }}
+          ]
+        }}
+        """
+        try:
+            respuesta = self.modelo.generate_content(prompt_destilacion)
+            self.logger.debug(f"Respuesta de destilación cruda: {respuesta.text}")
+            json_text = respuesta.text.strip().replace('```json', '').replace('```', '')
+            habilidad_destilada = json.loads(json_text)
+
+            nombre = habilidad_destilada.get('nombre_habilidad', 'sin_nombre')
+            descripcion = habilidad_destilada.get('descripcion', 'una nueva habilidad')
+            pasos_str = "".join([f"  {i+1}. {paso['accion']}: {paso.get('params', {})}\n" for i, paso in enumerate(habilidad_destilada.get('pasos', []))])
+
+            pregunta = f"He aprendido una nueva habilidad: '{descripcion}'.\nLos pasos que he deducido son:\n{pasos_str}¿Es este procedimiento correcto y quieres que lo guarde como la habilidad '{nombre}'? (sí/no)"
+
+            self.estado_agente['esperando_aprobacion'] = True
+            self.estado_agente['habilidad_destilada'] = habilidad_destilada
             
-            if not self.actuar(decision):
-                self.logger.info(f"Agente finalizando. Razón: {decision.get('params', {}).get('razon', 'Acción fallida o finalizada')}")
+            self.comunicador.hablar(pregunta)
+
+            # Guardar en la base de datos y luego añadir a la lista local
+            rol = 'agente'
+            contenido = {'texto': pregunta, 'adjunto': None}
+            self.memoria.guardar_mensaje(self.mi_id_ventana, rol, contenido)
+            self.historial_conversacion.append({'rol': rol, 'contenido': pregunta})
+
+            self.comunicador.finalizar_habla()
+        except Exception as e:
+            self.logger.error(f"Error durante la destilación del conocimiento: {e}")
+            self.comunicador.hablar("Tuve un problema al procesar lo que aprendí. Empezaré de nuevo.")
+            self.comunicador.finalizar_habla()
+
+    def stream_run(self):
+        if not self.operativo or not self.objetivo:
+            self.comunicador.hablar("Error: El agente no es operativo o no tiene objetivo.")
+            return
+
+        self.logger.info(f"--- INICIANDO BUCLE DE EJECUCIÓN para el objetivo: '{self.objetivo}' ---")
+        
+        last_progress_time = time.time()
+        
+        while True:
+            self.logger.info("--- Nuevo ciclo de Observar-Pensar-Actuar ---")
+
+            if time.time() - last_progress_time > 25:
+                self.logger.warning("El agente no ha progresado en 25 segundos. Pidiendo ayuda.")
+                self.comunicador.hablar("Parece que estoy atascado. ¿Puedes darme una pista o un objetivo más simple?")
+                self.comunicador.finalizar_habla()
                 break
             
-            time.sleep(2)
+            captura_entorno, _ = self.observar()
+            decision = self.pensar(captura_entorno, None)
+
+            if decision.get("accion") in ["pedir_aclaracion", "hablar", "proponer_aprendizaje", "finalizar"]:
+                last_progress_time = time.time()
+            
+            resultado_actuar = self.actuar(decision)
+
+            if resultado_actuar == 'FINALIZAR':
+                params = decision.get('params', {})
+                razon = "Acción fallida o finalizada"
+                if isinstance(params, dict):
+                    razon = params.get('razon', 'Razón no especificada')
+                elif isinstance(params, str):
+                    razon = params
+                self.logger.info(f"Agente finalizando el bucle de ejecución. Razón: {razon}")
+                break
+            elif resultado_actuar == 'DETENER_Y_ESPERAR':
+                self.logger.info("Agente en espera de la respuesta del usuario.")
+                break
+            
+            time.sleep(1)
+        
+        self.logger.info("--- BUCLE DE EJECUCIÓN FINALIZADO ---")
+
+    # --- MÉTODOS DEL CICLO DE META-APRENDIZAJE ---
+
+    def iniciar_ciclo_meta_aprendizaje(self):
+        """Orquesta las fases de descubrimiento y procesamiento de conocimiento pasado."""
+        self.comunicador.hablar("Iniciando ciclo de meta-aprendizaje. Buscaré conocimiento útil en conversaciones pasadas.")
+        self.comunicador.finalizar_habla()
+
+        # Fase 1: Descubrir nuevas oportunidades en chats sin analizar
+        self._fase_descubrimiento()
+
+        # Fase 2: Procesar una oportunidad pendiente
+        self._fase_procesamiento()
+
+        self.comunicador.hablar("Ciclo de meta-aprendizaje finalizado.")
+        self.comunicador.finalizar_habla()
+
+    def _fase_descubrimiento(self):
+        """Busca un chat no analizado y extrae todas las habilidades potenciales."""
+        self.logger.info("META-APRENDIZAJE: Iniciando Fase de Descubrimiento.")
+        session_key_a_analizar = self.memoria.buscar_chat_sin_analizar()
+
+        if not session_key_a_analizar:
+            self.logger.info("META-APRENDIZAJE: No hay conversaciones nuevas que analizar.")
+            self.comunicador.hablar("No he encontrado conversaciones nuevas para analizar.")
+            self.comunicador.finalizar_habla()
+            return
+
+        self.comunicador.hablar(f"Analizando la conversación '{session_key_a_analizar}' en busca de habilidades...")
+        self.comunicador.finalizar_habla()
+
+        historial_crudo = self.memoria._recuperar_historial_crudo(session_key_a_analizar, limit=500)
+        historial_str = "\n".join([f"{msg['role']}: {msg.get('content', {}).get('texto', '')}" for msg in historial_crudo])
+
+        prompt_extraccion = f"""
+        Analiza el siguiente historial de conversación y detecta cada procedimiento o tarea discreta que el usuario le enseñó al agente.
+        Para cada procedimiento, crea un objeto JSON con una "descripcion" clara y concisa de la habilidad aprendida.
+        
+        HISTORIAL:
+        {historial_str}
+        
+        RESPUESTA (ÚNICAMENTE JSON), una lista de objetos:
+        [ 
+            {{ "descripcion": "<Descripción de la primera habilidad potencial>" }},
+            {{ "descripcion": "<Descripción de la segunda habilidad potencial>" }}
+        ]
+        """
+        try:
+            respuesta = self.modelo.generate_content(prompt_extraccion)
+            self.logger.debug(f"Respuesta de extracción de hipótesis: {respuesta.text}")
+            json_text = respuesta.text.strip().replace('```json', '').replace('```', '')
+            hipotesis = json.loads(json_text)
+
+            if hipotesis and isinstance(hipotesis, list):
+                self.memoria.crear_oportunidades_de_aprendizaje(session_key_a_analizar, hipotesis)
+                self.comunicador.hablar(f"Análisis completo. He encontrado {len(hipotesis)} posibles nuevas habilidades.")
+                self.comunicador.finalizar_habla()
+            else:
+                self.comunicador.hablar("No encontré habilidades claras en esa conversación.")
+                self.comunicador.finalizar_habla()
+
+            # Marcar la sesión como analizada para no repetirla
+            self.memoria.marcar_sesion_como_analizada(session_key_a_analizar)
+
+        except Exception as e:
+            self.logger.error(f"META-APRENDIZAJE: Error en la fase de descubrimiento: {e}")
+            self.comunicador.hablar("Tuve un problema analizando esa conversación.")
+            self.comunicador.finalizar_habla()
+
+    def _fase_procesamiento(self):
+        """Busca una oportunidad de aprendizaje pendiente y la procesa."""
+        self.logger.info("META-APRENDIZAJE: Iniciando Fase de Procesamiento.")
+        oportunidad = self.memoria.obtener_oportunidad_pendiente()
+
+        if not oportunidad:
+            self.logger.info("META-APRENDIZAJE: No hay oportunidades de aprendizaje pendientes.")
+            self.comunicador.hablar("No tengo ninguna habilidad nueva que verificar por ahora.")
+            self.comunicador.finalizar_habla()
+            return
+
+        oportunidad_id = oportunidad["oportunidad_id"]
+        descripcion = oportunidad["descripcion_hipotesis"]
+        fuente_session_id = oportunidad["fuente_session_id"]
+
+        # En un futuro, aquí iría el ciclo de verificación autónoma.
+        # Por ahora, le preguntamos directamente al usuario si la hipótesis es válida.
+        pregunta_verificacion = f"He encontrado una habilidad potencial de una conversación pasada: '{descripcion}'. ¿Crees que esto es una habilidad útil que debería intentar aprender y formalizar? (sí/no)"
+        self.comunicador.hablar(pregunta_verificacion)
+        self.comunicador.finalizar_habla()
+
+        # Aquí el agente se pone en modo de espera. La respuesta del usuario (sí/no)
+        # se procesará en el siguiente ciclo de `establecer_objetivo`.
+        self.estado_agente['esperando_aprobacion_meta'] = True
+        self.estado_agente['oportunidad_en_revision'] = oportunidad
+        self.logger.info(f"Esperando aprobación del usuario para la oportunidad {oportunidad_id}")
+
 
 if __name__ == '__main__':
-    agente = Agente()
-    if agente.operativo:
-        # Guardar el nuevo conocimiento sobre las barras de desplazamiento
-        agente.kb.guardar_habilidad(
-            nombre_recurso="navegacion_ventana",
-            tipo_recurso="Sistema Operativo",
-            datos_habilidad={
-                "descripcion": "Cómo navegar por contenido que no es visible en una ventana utilizando las barras de desplazamiento.",
-                "acciones": [
-                    {
-                        "nombre": "arrastrar_barra",
-                        "descripcion": "Arrastra la barra de desplazamiento vertical u horizontal para revelar otras partes del contenido.",
-                        "parametros": {
-                            "direccion": "'vertical' o 'horizontal'",
-                            "porcentaje": "Un número de 0 a 100 que representa qué tan lejos mover la barra."
-                        },
-                        "cuando_usar": "Cuando se necesita hacer un desplazamiento grande y rápido por el contenido de una ventana."
-                    },
-                    {
-                        "nombre": "scroll",
-                        "descripcion": "Usa la rueda del ratón para desplazamientos pequeños y precisos.",
-                        "cuando_usar": "Cuando se necesita hacer un ajuste fino en la vista actual."
-                    }
-                ],
-                "heuristica": "La longitud de la barra de desplazamiento es proporcional a la cantidad de contenido visible. Una barra corta indica mucho contenido oculto. La posición de la barra indica la ubicación actual."
-            }
-        )
+    # Esta parte es para pruebas y no se ejecuta desde la GUI
+    def main_test():
+        agente = Agente(id_ventana="test_agent")
+        if agente.operativo:
+            agente.establecer_objetivo("abrir notepad y escribir hola mundo")
+            agente.stream_run()
 
-        agente.establecer_objetivo("Abre el Bloc de notas, escribe 'Hola, mundo!' y luego utiliza la herramienta de OCR para leer el texto y guardarlo en el historial.")
-        agente.run()
+    main_test()
