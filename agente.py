@@ -4,6 +4,7 @@ import google.generativeai as genai
 from PIL import Image
 import pyautogui
 import logging
+import threading
 
 # Módulos de la aplicación
 import config
@@ -14,6 +15,9 @@ from memoria_chat_mongodb import MongoDBChatMemory
 from logger_config import setup_logging
 from comunicador import Comunicador
 import lock_manager
+
+# Lock global para serializar las llamadas a la API de Gemini y evitar cruces
+gemini_api_lock = threading.Lock()
 
 class Agente:
     """
@@ -127,8 +131,10 @@ class Agente:
         # 1. Obtener contexto resumiendo la memoria
         resumen_memoria = self.memoria.resumir_y_consultar(session_key=self.mi_id_ventana)
 
-        # 2. Buscar conocimiento relevante en la KB
-        habilidad_conocida = self.kb.conocer_habilidad(self.objetivo)
+        # 2. Buscar conocimiento relevante en la KB (solo para modo autónomo)
+        habilidad_conocida = None
+        if self.modo == 'autonomo':
+            habilidad_conocida = self.kb.conocer_habilidad(self.objetivo)
 
         # 3. Construir el prompt con el contexto de memoria y KB
         prompt = self._construir_prompt(resumen_memoria=resumen_memoria, habilidad=habilidad_conocida)
@@ -173,15 +179,50 @@ class Agente:
 
             return {"accion": "hablar", "params": {"mensaje": mensaje}}
 
-    def _construir_prompt(self, resumen_memoria: str, habilidad=None, es_modo_controlador=False):
+    def _construir_prompt(self, resumen_memoria: str, habilidad=None):
+        es_modo_controlador = self.modo == 'controlador'
+
         acciones_disponibles_str = ""
         if self.habilidades_fundamentales and 'datos' in self.habilidades_fundamentales and 'acciones' in self.habilidades_fundamentales['datos']:
             for accion in self.habilidades_fundamentales['datos']['acciones']:
+                # En modo controlador, las acciones principales son para comunicarse.
+                if es_modo_controlador and accion['nombre'] not in ['escribir', 'hablar', 'finalizar']:
+                    continue
                 acciones_disponibles_str += f"- `{accion['nombre']}`: {accion.get('params', '{}')} ({accion.get('descripcion', '')})\n"
 
-        contexto_habilidad = f"CONTEXTO DE CONOCIMIENTO PREVIO:\n{json.dumps(habilidad['datos'], indent=2, ensure_ascii=False)}" if habilidad else ""
+        if es_modo_controlador:
+            habilidad_supervisor = self.kb.conocer_habilidad('entrenamiento_supervisado')
+            protocolo_supervisor = "Error: No se encontró el protocolo de supervisión en la KB."
+            if habilidad_supervisor and 'datos' in habilidad_supervisor and 'descripcion' in habilidad_supervisor['datos']:
+                 protocolo_supervisor = habilidad_supervisor['datos']['descripcion']
 
-        prompt_base = f"""
+            prompt = f"""
+Tu rol es InteractIA-Supervisor, un agente de IA que enseña a otro agente de IA (el 'controlado') a completar una tarea.
+
+OBJETIVO ACTUAL: Enseñar al agente controlado a completar la tarea: '{self.objetivo}'
+
+PROTOCOLO DE SUPERVISIÓN OBLIGATORIO:
+{protocolo_supervisor}
+
+CONTEXTO DE MEMORIA RELEVANTE (Tu conversación con el usuario que te supervisa a ti):
+{resumen_memoria}
+
+TAREA PRINCIPAL:
+Tu única función es generar el siguiente prompt para el agente controlado. Sigue tu protocolo estrictamente.
+1.  **Analiza**: Observa la pantalla del controlado (incluida en la imagen) y tu conversación con el usuario.
+2.  **Decide**: Formula el siguiente prompt para el controlado. Puede ser un paso en la tarea, una corrección o una pregunta para guiarle.
+3.  **Actúa**: Tu acción DEBE ser `escribir` o `hablar`, y el contenido será el prompt para el controlado. Si la tarea ha terminado, usa `finalizar`.
+
+HERRAMIENTAS DE SUPERVISOR (Simplificadas):
+{acciones_disponibles_str}
+RESPUESTA (ÚNICAMENTE JSON con la acción 'escribir', 'hablar' o 'finalizar'):
+"""
+            return prompt
+
+        else: # Modo Autónomo (lógica original)
+            contexto_habilidad = f"CONTEXTO DE CONOCIMIENTO PREVIO:\n{json.dumps(habilidad['datos'], indent=2, ensure_ascii=False)}" if habilidad else ""
+
+            prompt = f"""
 Tu rol es InteractIA, un agente de IA que completa tareas controlando un ordenador.
 
 OBJETIVO ACTUAL: '{self.objetivo}'
@@ -202,41 +243,97 @@ HABILIDADES FUNDAMENTALES (Tus herramientas):
 {acciones_disponibles_str}
 RESPUESTA (ÚNICAMENTE JSON):
 """
-        if es_modo_controlador:
-            prompt_context = f"""MODO DE OPERACIÓN: Controlador..."""
-        else:
-            prompt_context = f"""MODO DE OPERACIÓN: Autónomo..."""
-        
-        return prompt_base + prompt_context
+            return prompt
 
     def llm_call(self, prompt: str, captura_entorno: Image.Image, captura_objetivo: Image.Image):
-        self.logger.info("Enviando petición al modelo de IA...")
-        try:
-            contenido = [prompt, captura_entorno]
-            respuesta = self.modelo.generate_content(contenido)
-            self.logger.debug(f"Respuesta cruda del modelo: {respuesta.text}")
+        self.logger.info("Esperando el bloqueo de la API de Gemini...")
+        with gemini_api_lock:
+            self.logger.info("Bloqueo adquirido. Enviando petición al modelo de IA...")
+            try:
+                contenido = [prompt, captura_entorno]
+                respuesta = self.modelo.generate_content(contenido)
+                self.logger.debug(f"Respuesta cruda del modelo: {respuesta.text}")
 
-            json_text = respuesta.text.strip().replace('```json', '').replace('```', '')
-            decision = json.loads(json_text)
+                json_text = respuesta.text.strip().replace('```json', '').replace('```', '')
+                decision = json.loads(json_text)
 
-            if not isinstance(decision, dict) or 'accion' not in decision:
-                for key, value in decision.items():
-                    if key in [a['nombre'] for a in self.habilidades_fundamentales['datos']['acciones']]:
-                        self.logger.warning(f"Respuesta JSON mal formada detectada. Auto-corrigiendo a formato estándar.")
-                        decision = {"accion": key, "params": value}
-                        break
-            
-            self.logger.info(f"Decisión recibida del modelo: {decision}")
-            return decision
-        except Exception as e:
-            self.logger.error(f"ERROR al llamar al modelo de IA o parsear su respuesta: {e}")
-            return {"accion": "finalizar", "params": {"razon": "Error en el módulo de decisión"}}
+                if not isinstance(decision, dict) or 'accion' not in decision:
+                    for key, value in decision.items():
+                        if key in [a['nombre'] for a in self.habilidades_fundamentales['datos']['acciones']]:
+                            self.logger.warning(f"Respuesta JSON mal formada detectada. Auto-corrigiendo a formato estándar.")
+                            decision = {"accion": key, "params": value}
+                            break
+                
+                self.logger.info(f"Decisión recibida del modelo: {decision}")
+                return decision
+            except Exception as e:
+                self.logger.error(f"ERROR al llamar al modelo de IA o parsear su respuesta: {e}")
+                return {"accion": "finalizar", "params": {"razon": "Error en el módulo de decisión"}}
 
     def actuar(self, decision: dict):
         accion = decision.get("accion")
         params = decision.get("params", {})
         self.logger.info(f"--- Fase: Actuar ({accion}) ---")
 
+        # Lógica especial para el modo controlador (Supervisor)
+        if self.modo == 'controlador' and accion in ['escribir', 'hablar']:
+            texto_a_escribir = ""
+            if isinstance(params, dict):
+                texto_a_escribir = params.get('texto', params.get('mensaje', ''))
+            else:
+                texto_a_escribir = params
+
+            if not texto_a_escribir:
+                self.logger.warning("Modo controlador: no hay texto para escribir.")
+                return 'CONTINUAR'
+
+            self.logger.info(f"Modo controlador: Intentando escribir en la ventana objetivo '{self.titulo_objetivo}'")
+            
+            if self.controlador.enfocar_ventana(self.titulo_objetivo):
+                self.controlador.esperar(0.5) # Pequeña pausa para que la ventana se active
+                captura_ventana = self.vision.capturar_ventana_objetivo(self.titulo_objetivo)
+                if captura_ventana:
+                    # Buscar el botón "Enviar" para localizar el cuadro de texto
+                    elementos = self.vision.leer_texto_en_pantalla(captura_ventana)
+                    enviar_button = None
+                    for elem in elementos:
+                        if "enviar" in elem.get('texto', '').lower():
+                            enviar_button = elem
+                            break
+                    
+                    if enviar_button:
+                        # Asumimos que el input está a la izquierda del botón "Enviar"
+                        # Calculamos el centro del cuadro de texto
+                        input_x = enviar_button['left'] - 100 # Un valor estimado a la izquierda
+                        input_y = enviar_button['top'] + (enviar_button['height'] // 2)
+                        
+                        # Las coordenadas de OCR son relativas a la captura de la ventana,
+                        # necesitamos hacerlas absolutas a la pantalla.
+                        ventanas = pyautogui.getWindowsWithTitle(self.titulo_objetivo)
+                        if ventanas:
+                            ventana_objetivo = ventanas[0]
+                            abs_x = ventana_objetivo.left + input_x
+                            abs_y = ventana_objetivo.top + input_y
+                            
+                            self.controlador.clic(abs_x, abs_y)
+                            self.controlador.esperar(0.2)
+                            self.controlador.escribir(texto_a_escribir)
+                            self.logger.info("Modo controlador: Texto escrito en la ventana objetivo.")
+                            # Opcional: presionar Enter o hacer clic en Enviar
+                            # self.controlador.presionar_tecla('enter')
+                        else:
+                            self.logger.error("Modo controlador: Se perdió la ventana objetivo después de encontrar el botón.")
+
+                    else:
+                        self.logger.warning("Modo controlador: No se encontró el botón 'Enviar' en la ventana objetivo.")
+                else:
+                    self.logger.warning("Modo controlador: No se pudo capturar la ventana objetivo después de enfocarla.")
+            else:
+                self.logger.error(f"Modo controlador: No se pudo enfocar la ventana objetivo '{self.titulo_objetivo}'.")
+            
+            return 'CONTINUAR' # El supervisor continúa su propio ciclo
+
+        # Lógica original para el modo autónomo
         lock_manager.acquire_lock(self.mi_id_ventana)
         try:
             if accion == "proponer_aprendizaje":
@@ -360,9 +457,23 @@ RESPUESTA (ÚNICAMENTE JSON):
             self.comunicador.hablar("Tuve un problema al procesar lo que aprendí. Empezaré de nuevo.")
             self.comunicador.finalizar_habla()
 
+    def _publicar_estado(self, decision: dict, estado_bucle: str):
+        """Publica el estado actual del agente a la base de datos."""
+        if not self.memoria.operativo:
+            return
+
+        estado_data = {
+            'objetivo_actual': self.objetivo,
+            'ultima_decision': decision,
+            'estado_bucle': estado_bucle,
+            'historial_acciones': self.historial_acciones[-5:] # Publicar las últimas 5 acciones
+        }
+        self.memoria.publicar_estado_agente(self.mi_id_ventana, estado_data)
+
     def stream_run(self):
         if not self.operativo or not self.objetivo:
             self.comunicador.hablar("Error: El agente no es operativo o no tiene objetivo.")
+            self._publicar_estado({"accion": "finalizar", "params": {"razon": "No operativo o sin objetivo"}}, "ERROR")
             return
 
         self.logger.info(f"--- INICIANDO BUCLE DE EJECUCIÓN para el objetivo: '{self.objetivo}' ---")
@@ -376,10 +487,12 @@ RESPUESTA (ÚNICAMENTE JSON):
                 self.logger.warning("El agente no ha progresado en 25 segundos. Pidiendo ayuda.")
                 self.comunicador.hablar("Parece que estoy atascado. ¿Puedes darme una pista o un objetivo más simple?")
                 self.comunicador.finalizar_habla()
+                self._publicar_estado({"accion": "finalizar", "params": {"razon": "Timeout de progreso"}}, "ATASCADO")
                 break
             
             captura_entorno, _ = self.observar()
             decision = self.pensar(captura_entorno, None)
+            self._publicar_estado(decision, "PENSANDO")
 
             if decision.get("accion") in ["pedir_aclaracion", "hablar", "proponer_aprendizaje", "finalizar"]:
                 last_progress_time = time.time()
@@ -394,9 +507,11 @@ RESPUESTA (ÚNICAMENTE JSON):
                 elif isinstance(params, str):
                     razon = params
                 self.logger.info(f"Agente finalizando el bucle de ejecución. Razón: {razon}")
+                self._publicar_estado(decision, "FINALIZADO")
                 break
             elif resultado_actuar == 'DETENER_Y_ESPERAR':
                 self.logger.info("Agente en espera de la respuesta del usuario.")
+                self._publicar_estado(decision, "ESPERANDO_USUARIO")
                 break
             
             time.sleep(1)

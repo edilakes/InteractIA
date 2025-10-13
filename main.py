@@ -14,7 +14,7 @@ def generar_id_aleatorio(longitud=6):
 def main():
     """Punto de entrada principal para la aplicación InteractIA."""
     parser = argparse.ArgumentParser(description="InteractIA - Agente de IA Autónomo")
-    parser.add_argument("--controlar-id", type=str, help="El ID de la instancia de InteractIA a controlar.")
+    parser.add_argument("--supervisando-a", type=str, help="El ID de la instancia de InteractIA a supervisar.")
     # Añadir aquí futuros argumentos de línea de comandos
 
     args, unknown = parser.parse_known_args()
@@ -33,7 +33,7 @@ def main():
         titulo_ventana = f"interactia-{id_instancia}"
 
         root = tk.Tk()
-        app = InteractIAGUI(root, titulo=titulo_ventana, id_objetivo=args.controlar_id)
+        app = InteractIAGUI(root, titulo=titulo_ventana, id_objetivo=args.supervisando_a)
         root.mainloop()
 
 if __name__ == "__main__":

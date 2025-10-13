@@ -15,6 +15,22 @@ class Controlador:
         pyautogui.FAILSAFE = False
         self.logger.debug("Controlador inicializado.")
 
+    def enfocar_ventana(self, titulo: str) -> bool:
+        """Encuentra una ventana por su título y la activa (la trae al frente)."""
+        try:
+            ventanas = pyautogui.getWindowsWithTitle(titulo)
+            if ventanas:
+                ventana = ventanas[0]
+                ventana.activate()
+                self.logger.info(f"Ventana '{titulo}' enfocada correctamente.")
+                return True
+            else:
+                self.logger.warning(f"No se encontró ninguna ventana con el título: '{titulo}'")
+                return False
+        except Exception as e:
+            self.logger.error(f"Error al enfocar la ventana '{titulo}': {e}")
+            return False
+
     def mover_raton(self, x, y, duracion=1):
         self.logger.info(f"Moviendo ratón a ({x}, {y}).", extra={'extra_data': {'x': x, 'y': y, 'duracion': duracion}})
         pyautogui.moveTo(x, y, duration=duracion)

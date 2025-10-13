@@ -2,6 +2,8 @@ import tkinter as tk
 from tkinter import ttk
 from agente import Agente
 import threading
+import subprocess
+import sys
 
 class InteractIAGUI:
     def __init__(self, root, titulo="InteractIA - Agente Inteligente", id_objetivo=None):
@@ -58,6 +60,11 @@ class InteractIAGUI:
         self.send_button = ttk.Button(self.input_frame, text="Enviar", command=self.process_command)
         self.send_button.grid(row=0, column=2, padx=5)
 
+        # --- Botón para Instancia Supervisora ---
+        if not id_objetivo: # Solo mostrar si no es una instancia ya supervisada
+            self.supervisor_button = ttk.Button(self.input_frame, text="Crear Supervisor", command=self.crear_instancia_supervisora)
+            self.supervisor_button.grid(row=0, column=3, padx=5)
+
         # --- Inicialización ---
         self._configure_chat_tags()
         self.agente = Agente(
@@ -67,6 +74,26 @@ class InteractIAGUI:
             callback_finalizar=self.finalizar_respuesta_agente
         )
         self._agent_writing = False
+
+    def crear_instancia_supervisora(self):
+        """Lanza una nueva instancia en modo Supervisor para ayudar a esta instancia."""
+        try:
+            # Extraer el ID de la ventana actual. El formato es "interactia-XXXXXX"
+            current_id = self.titulo_ventana.split('-')[-1]
+            
+            # Usar sys.executable para asegurar que se usa el mismo intérprete de Python
+            comando = [
+                sys.executable, 
+                'main.py', 
+                '--supervisando-a', 
+                current_id
+            ]
+            
+            # Usar Popen para lanzar el proceso de forma no bloqueante
+            subprocess.Popen(comando)
+            self.insert_message(f"Lanzando nueva instancia supervisora para esta ventana (ID: {current_id})", 'agent')
+        except Exception as e:
+            self.insert_message(f"Error al lanzar instancia supervisora: {e}", 'agent')
 
     def _configure_chat_tags(self):
         """Configura los tags para roles y formatos."""

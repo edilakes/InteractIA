@@ -34,9 +34,10 @@ class MongoDBChatMemory:
             self.collection_chats = self.db[MONGODB_CHAT_COLLECTION]
             self.collection_oportunidades = self.db[MONGODB_OPORTUNIDADES_COLLECTION]
             self.collection_sesiones_analizadas = self.db[MONGODB_SESIONES_ANALIZADAS_COLLECTION]
+            self.collection_estado = self.db["estado_agentes"] # Nueva colección para el estado
             
             self.operativo = True
-            self.logger.info(f"Memoria conectada a MongoDB. Gestionando 3 colecciones.")
+            self.logger.info(f"Memoria conectada a MongoDB. Gestionando 4 colecciones.")
 
         except Exception as e:
             self.logger.error(f"ERROR al inicializar MongoDBChatMemory: {e}")
@@ -126,6 +127,24 @@ class MongoDBChatMemory:
                 'contenido': texto_contenido
             })
         return historial_simple
+
+    # --- MÉTODO PARA PUBLICAR ESTADO ---
+
+    def publicar_estado_agente(self, session_key: str, estado_data: dict):
+        """Publica el estado interno de un agente en una colección dedicada."""
+        if not self.operativo: return
+        try:
+            # Añadir un timestamp al estado antes de guardarlo
+            estado_data['timestamp'] = datetime.datetime.now(timezone.utc)
+            
+            self.collection_estado.update_one(
+                {'_id': session_key},
+                {'$set': estado_data},
+                upsert=True
+            )
+            self.logger.debug(f"Estado del agente {session_key} publicado correctamente.")
+        except Exception as e:
+            self.logger.error(f"Error al publicar estado del agente {session_key}: {e}")
 
     # --- MÉTODOS PARA EL CICLO DE META-APRENDIZAJE ---
 
