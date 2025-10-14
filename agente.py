@@ -214,8 +214,7 @@ Tu única función es generar el siguiente prompt para el agente controlado. Sig
 3.  **Actúa**: Tu acción DEBE ser `escribir` o `hablar`, y el contenido será el prompt para el controlado. Si la tarea ha terminado, usa `finalizar`.
 
 HERRAMIENTAS DE SUPERVISOR (Simplificadas):
-{acciones_disponibles_str}
-RESPUESTA (ÚNICAMENTE JSON con la acción 'escribir', 'hablar' o 'finalizar'):
+{acciones_disponibles_str}RESPUESTA (ÚNICAMENTE JSON con la acción 'escribir', 'hablar' o 'finalizar'):
 """
             return prompt
 
@@ -240,8 +239,7 @@ Tu deber es analizar el objetivo y el contexto de memoria para crear un plan de 
 4.  **Reflexiona y Propón Aprendizaje**: Si finalizas una tarea con éxito y crees que el procedimiento es nuevo y reutilizable, tu acción final DEBE ser `proponer_aprendizaje`.
 
 HABILIDADES FUNDAMENTALES (Tus herramientas):
-{acciones_disponibles_str}
-RESPUESTA (ÚNICAMENTE JSON):
+{acciones_disponibles_str}RESPUESTA (ÚNICAMENTE JSON):
 """
             return prompt
 
@@ -257,7 +255,14 @@ RESPUESTA (ÚNICAMENTE JSON):
                 json_text = respuesta.text.strip().replace('```json', '').replace('```', '')
                 decision = json.loads(json_text)
 
-                if not isinstance(decision, dict) or 'accion' not in decision:
+                # Si la respuesta es una lista (como en el caso del mapa de interacción)
+                if isinstance(decision, list):
+                    self.logger.info("Respuesta de tipo lista detectada. Se envolverá en la acción 'hablar'.")
+                    # Convertimos la lista a un string JSON formateado para que sea legible
+                    mensaje_json = json.dumps(decision, indent=2, ensure_ascii=False)
+                    decision = {"accion": "hablar", "params": {"mensaje": mensaje_json}}
+                
+                elif not isinstance(decision, dict) or 'accion' not in decision:
                     for key, value in decision.items():
                         if key in [a['nombre'] for a in self.habilidades_fundamentales['datos']['acciones']]:
                             self.logger.warning(f"Respuesta JSON mal formada detectada. Auto-corrigiendo a formato estándar.")
@@ -272,7 +277,7 @@ RESPUESTA (ÚNICAMENTE JSON):
 
     def actuar(self, decision: dict):
         accion = decision.get("accion")
-        params = decision.get("params", {})
+        params = decision.get("params", decision) # Acepta params anidados o en el nivel superior
         self.logger.info(f"--- Fase: Actuar ({accion}) ---")
 
         # Lógica especial para el modo controlador (Supervisor)
@@ -401,6 +406,9 @@ RESPUESTA (ÚNICAMENTE JSON):
             self.historial_acciones.append(decision)
             return 'CONTINUAR'
 
+        except KeyError as e:
+            self.logger.error(f"ERROR al ejecutar la acción '{accion}': Falta el parámetro {e}")
+            return 'FINALIZAR'
         except Exception as e:
             self.logger.error(f"ERROR al ejecutar la acción '{accion}': {e}")
             return 'FINALIZAR'

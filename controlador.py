@@ -60,7 +60,11 @@ class Controlador:
 
     def presionar_tecla(self, tecla):
         self.logger.info(f"Presionando tecla: '{tecla}'.", extra={'extra_data': {'tecla': tecla}})
-        pyautogui.press(tecla)
+        if '+' in tecla:
+            partes = tecla.split('+')
+            pyautogui.hotkey(*partes)
+        else:
+            pyautogui.press(tecla)
 
     def mantener_tecla(self, tecla):
         self.logger.info(f"Manteniendo pulsada la tecla: '{tecla}'.", extra={'extra_data': {'tecla': tecla}})
