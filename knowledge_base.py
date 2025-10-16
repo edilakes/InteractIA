@@ -82,6 +82,27 @@ class KnowledgeBase:
             
         return self.collection.find_one({"nombre_recurso": nombre_recurso})
 
+    def conocer_habilidades_por_contexto(self, contextos: list):
+        """
+        Busca y devuelve todas las habilidades que coinciden con una lista de contextos.
+
+        Args:
+            contextos (list[str]): Una lista de contextos a buscar (ej. ["Microsoft Word", "General"]).
+
+        Returns:
+            list: Una lista de documentos de habilidad que coinciden.
+        """
+        if not self.client:
+            print("(-) No se puede consultar habilidades, no hay conexión con la base de datos.")
+            return []
+        
+        query = {
+            "datos.contexto_aplicacion": {
+                "$in": contextos
+            }
+        }
+        return list(self.collection.find(query))
+
     def get_all_skills(self):
         """
         Devuelve todas las habilidades de la base de datos.
@@ -118,7 +139,8 @@ if __name__ == '__main__':
         datos_test = {
             "endpoint": "https://api_prueba.com/v1",
             "metodos": ["GET", "POST"],
-            "ejemplo": "GET /v1/items"
+            "ejemplo": "GET /v1/items",
+            "contexto_aplicacion": ["General"]
         }
 
         # 1. Aprender la habilidad
@@ -134,6 +156,14 @@ if __name__ == '__main__':
             print("\n(+) La aserción de datos fue exitosa.")
         else:
             print("(-) ERROR: No se pudo conocer la habilidad aprendida.")
+
+        # 2.5 Probar la nueva función
+        habilidades_contextuales = kb.conocer_habilidades_por_contexto(["General"])
+        print("\n(+) Habilidades contextuales encontradas:")
+        for h in habilidades_contextuales:
+            print(f"  - {h['nombre_recurso']}")
+        assert len(habilidades_contextuales) > 0
+        print("\n(+) La aserción de contexto fue exitosa.")
 
         # 3. Olvidar la habilidad
         kb.olvidar_habilidad(nombre_test)

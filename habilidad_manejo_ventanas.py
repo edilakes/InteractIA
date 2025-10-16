@@ -3,6 +3,7 @@ from knowledge_base import KnowledgeBase
 # Definición de la habilidad: Manejo de Ventanas en Windows
 datos_habilidad = {
     "descripcion": "Cómo manejar ventanas en Windows: abrir, cerrar, maximizar, minimizar, mover, cambiar de tamaño y organizar ventanas.",
+    "contexto_aplicacion": ["General"], # Habilidad disponible en cualquier contexto
     "acciones": [
         {
             "nombre": "abrir_ventana",
