@@ -18,38 +18,40 @@ def run_and_log(command_str):
 
         if process.returncode != 0:
             if "nothing to commit" in output or "nada para hacer commit" in output:
-                 print("\n--- INFO: No había nuevos cambios para incluir en el commit. ---")
+                 print("--- INFO: No habia nuevos cambios para incluir en el commit. ---")
                  return True
             
-            print(f"\n!!! ERROR: El comando finalizó con código de salida {process.returncode} !!!")
+            print(f"!!! ERROR: El comando finalizo con codigo de salida {process.returncode} !!!")
             return False
             
-        print(f"\n--- Comando finalizado con éxito ---\n")
+        print("--- Comando finalizado con exito ---")
         return True
 
     except Exception as e:
-        print(f"!!! Ocurrió un error inesperado al ejecutar el comando: {e} !!!")
+        print(f"!!! Ocurrio un error inesperado al ejecutar el comando: {e} !!!")
         return False
 
 def main():
     """
-    Script para automatizar el proceso de commit y compilación de la aplicación InteractIA.
+    Script para automatizar el proceso de commit y compilacion de la aplicacion InteractIA.
     """
-    print(">>> INICIANDO SCRIPT DE COMMIT Y COMPILACIÓN AUTOMÁTICA <<<\\n")
+    print(">>> INICIANDO SCRIPT DE COMMIT Y COMPILACION AUTOMATICA <<<")
 
     if not run_and_log("git add ."):
-        print("\\n>>> Proceso abortado por error en 'git add'.")
+        print(">>> Proceso abortado por error en 'git add'.")
         sys.exit(1)
 
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    commit_message = f"Build automático: {timestamp}"
+    commit_message = f"Build automatico: {timestamp}"
     if not run_and_log(f'git commit -m "{commit_message}"'):
-        print("\\nADVERTENCIA: 'git commit' no se completó como se esperaba, pero se continúa con la compilación.")
+        print("ADVERTENCIA: 'git commit' no se completo como se esperaba, pero se continua con la compilacion.")
     
     # --- COMANDO CORREGIDO ---
-    # Se añaden los módulos locales con --hidden-import para asegurar que PyInstaller los incluya.
+    # Se anade --paths . para que PyInstaller busque modulos en el directorio raiz.
+    # Se mantienen los --hidden-import para asegurar la inclusion de modulos no explicitos.
     pyinstaller_command = (
         "pyinstaller --onefile --noconsole --name InteractIA "
+        "--paths . "
         "--hidden-import=agente "
         "--hidden-import=controlador "
         "--hidden-import=vision "
@@ -64,10 +66,10 @@ def main():
     )
     
     if not run_and_log(pyinstaller_command):
-        print("\\n>>> Proceso abortado por error en la compilación con PyInstaller.")
+        print(">>> Proceso abortado por error en la compilacion con PyInstaller.")
         sys.exit(1)
 
-    print("\\n>>> SCRIPT FINALIZADO. La aplicación ha sido compilada en la carpeta 'dist'. <<<\\n")
+    print(">>> SCRIPT FINALIZADO. La aplicacion ha sido compilada en la carpeta 'dist'. <<<")
 
 if __name__ == "__main__":
     main()
