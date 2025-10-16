@@ -138,3 +138,45 @@ Esto crea una dinámica de **Tutor-Aprendiz**, donde el Supervisor ayuda al Apre
 5.  **Pensamiento (Supervisor):** Ve que `1234` está atascado o ha cometido un error.
 6.  **Actuación (Supervisor):** Usa su `controlador` para encontrar el cuadro de texto de `1234` y escribe una instrucción correctiva.
 7.  El ciclo se repite hasta que la tarea se completa.
+
+## 7. Análisis del Sistema de Aprendizaje y Propuesta de Autonomía
+
+### Situación Actual: Un Sistema Híbrido y Manual
+
+Actualmente, el agente aprende de dos maneras principales, ambas requiriendo intervención manual:
+
+1.  **Registro Directo (Los scripts `registrar_*.py`):**
+    *   **Cómo funciona:** Creas un script de Python (como los que hemos visto) donde defines una "habilidad" en un diccionario y usas la función `kb.aprender_habilidad()` para guardarla en la base de datos.
+    *   **Análisis:** Este método es robusto y bueno para definir habilidades complejas y fundamentales (como las de navegación o las acciones básicas). Sin embargo, es un proceso de desarrollo de software, no de aprendizaje autónomo. Cada nueva habilidad requiere que escribas y ejecutes código nuevo.
+
+2.  **Aprendizaje Semi-Autónomo (El script `aprendiz_gemini.py`):**
+    *   **Cómo funciona:** Este script abre la web de Gemini en Chrome y te pide que le preguntes a Gemini cómo hacer una tarea. Luego, **tú tienes que copiar y pegar manualmente** cada paso que te da Gemini en la terminal para que el script los guarde como una nueva habilidad.
+    *   **Análisis:** Esta es una idea muy potente y un gran primer paso hacia la autonomía. El agente intenta usar una fuente de conocimiento externa (Gemini) para aprender. El punto débil es la dependencia del usuario para hacer de "puente" entre la web de Gemini y el script.
+
+**En resumen: El sistema actual es funcional, pero no es autónomo. El agente no puede crear nuevas habilidades por sí mismo a partir de su experiencia o de consultas a Gemini sin una intervención manual significativa.**
+
+### Propuesta para la Autonomía Total: Un Plan en 3 Fases
+
+Para lograr que el agente aprenda de forma verdaderamente autónoma, te propongo el siguiente plan evolutivo:
+
+#### Fase 1: Del Script a la Conversación (Auto-Registro de Habilidades)
+
+*   **Objetivo:** Eliminar por completo la necesidad de los scripts `registrar_*.py` para habilidades sencillas.
+*   **Cómo:** Potenciaremos la acción `proponer_aprendizaje` que el agente ya conoce.
+    1.  Cuando el agente complete una tarea nueva o una secuencia de acciones que considere útil, podría usar `proponer_aprendizaje` para decirte: "He aprendido a hacer X. ¿Quieres que lo guarde como una nueva habilidad llamada 'habilidad_X'?".
+    2.  Si le respondes "sí", el propio agente llamaría internamente a la función `kb.aprender_habilidad()` para guardar esa nueva secuencia de acciones en su base de conocimiento, sin necesidad de ningún script.
+
+#### Fase 2: De la Web a la API (Automatización del Aprendizaje con Gemini)
+
+*   **Objetivo:** Eliminar el paso manual de copiar y pegar en `aprendiz_gemini.py`.
+*   **Cómo:** El agente ya usa la API de Gemini para "pensar". Podemos crear un "modo de aprendizaje" en el que use esa misma API para aprender.
+    1.  Cuando se enfrente a una tarea que no sabe cómo resolver, el agente podría entrar en "modo aprendizaje".
+    2.  En este modo, en lugar de preguntarse a sí mismo qué hacer, le preguntaría a la API de Gemini (con un prompt similar al de `aprendiz_gemini.py`): "¿Cómo puedo 'desinstalar UltraVNC'? Dame los pasos".
+    3.  El agente recibiría la respuesta directamente, la analizaría, y guardaría los pasos como una nueva habilidad. **Cero intervención del usuario.**
+
+#### Fase 3: Del Aprendizaje Reactivo al Proactivo (Iniciativa Propia)
+
+*   **Objetivo:** Que el agente decida por sí mismo cuándo y qué necesita aprender.
+*   **Cómo:** Una vez completadas las fases 1 y 2, el agente tendría las herramientas para aprender por sí solo. El siguiente paso es darle la iniciativa.
+    1.  **Auto-mejora por fallo:** Si el agente falla repetidamente en una tarea, podría activar automáticamente el "modo aprendizaje" (Fase 2) para buscar una solución.
+    2.  **Optimización de secuencias:** El agente podría analizar su propio historial de acciones y detectar patrones. Si ve que para hacer "Y" siempre ejecuta los pasos A, B y C, podría proponerte: "He notado que siempre hago A, B y C juntos. ¿Quieres que cree una nueva habilidad 'Y' que haga estos tres pasos de una vez?".
