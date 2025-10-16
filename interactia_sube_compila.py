@@ -47,11 +47,10 @@ def main():
         print("ADVERTENCIA: 'git commit' no se completo como se esperaba, pero se continua con la compilacion.")
     
     # --- COMANDO CORREGIDO ---
-    # Se anade --paths . para que PyInstaller busque modulos en el directorio raiz.
-    # Se mantienen los --hidden-import para asegurar la inclusion de modulos no explicitos.
+    # Se anade la ruta absoluta al proyecto para que PyInstaller la use.
     pyinstaller_command = (
         "pyinstaller --onefile --noconsole --name InteractIA "
-        "--paths . "
+        "--paths e:\\OneDrive\\MiCodigo\\VS\\InteractIA "
         "--hidden-import=agente "
         "--hidden-import=controlador "
         "--hidden-import=vision "
