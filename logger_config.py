@@ -21,7 +21,19 @@ class JsonFormatter(logging.Formatter):
         
         return json.dumps(log_record, ensure_ascii=False)
 
-def setup_logging(log_level=logging.DEBUG):
+class GUIHandler(logging.Handler):
+    """
+    Un handler de logging que envía los registros a la GUI a través de un comunicador.
+    """
+    def __init__(self, comunicador):
+        super().__init__()
+        self.comunicador = comunicador
+
+    def emit(self, record):
+        msg = self.format(record)
+        self.comunicador.log(msg)
+
+def setup_logging(log_level=logging.DEBUG, comunicador=None):
     """
     Configura el sistema de logging para todo el proyecto.
     """
@@ -44,6 +56,14 @@ def setup_logging(log_level=logging.DEBUG):
     simple_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
     console_handler.setFormatter(simple_formatter)
     logger.addHandler(console_handler)
+
+    # GUI handler
+    if comunicador:
+        gui_handler = GUIHandler(comunicador)
+        gui_handler.setLevel(logging.INFO) # Only show INFO and above in the GUI
+        gui_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        gui_handler.setFormatter(gui_formatter)
+        logger.addHandler(gui_handler)
 
 if __name__ == '__main__':
     # Configurar el logging

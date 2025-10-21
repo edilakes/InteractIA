@@ -26,7 +26,7 @@ def main():
         agente = Agente(callback_hablar=lambda msg: print(f"Agente: {msg}"))
         objetivo = " ".join(unknown)
         agente.establecer_objetivo(objetivo)
-        agente.run()
+        agente.stream_run()
     else:
         # Modo GUI
         id_instancia = generar_id_aleatorio()

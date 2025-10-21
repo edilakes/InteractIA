@@ -15,6 +15,8 @@ MAPEO_CONTEXTO = {
     "visual studio code": "Visual Studio Code",
     "explorador de archivos": "Explorador de archivos",
     "file explorer": "Explorador de archivos",
+    "símbolo del sistema": "Símbolo del sistema",
+    "command prompt": "Command Prompt",
 }
 
 def detectar_contexto_actual() -> str:

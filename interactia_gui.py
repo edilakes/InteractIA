@@ -71,7 +71,8 @@ class InteractIAGUI:
             id_ventana=self.titulo_ventana,
             id_objetivo=id_objetivo,
             callback_hablar=self.mostrar_mensaje_agente,
-            callback_finalizar=self.finalizar_respuesta_agente
+            callback_finalizar=self.finalizar_respuesta_agente,
+            callback_log=self.insert_log_message
         )
         self._agent_writing = False
 
@@ -99,6 +100,7 @@ class InteractIAGUI:
         """Configura los tags para roles y formatos."""
         self.chat_history_text.tag_configure('user', justify='right', background='#E0F7FA', relief='raised', borderwidth=1, lmargin1=60, lmargin2=60, spacing3=5)
         self.chat_history_text.tag_configure('agent', justify='left', background='#F0F0F0', foreground='black', relief='raised', borderwidth=1, lmargin1=10, lmargin2=10, spacing3=5)
+        self.chat_history_text.tag_configure('log', foreground='gray', font=('Arial', 8))
 
     def insert_message(self, message, role):
         """Inserta un mensaje completo en el historial de chat."""
@@ -106,6 +108,16 @@ class InteractIAGUI:
         timestamp = datetime.now().strftime("%H:%M:%S")
         self.chat_history_text.config(state='normal')
         self.chat_history_text.insert(tk.END, f"[{timestamp}] {message}\n\n", role)
+        self.chat_history_text.config(state='disabled')
+        self.chat_history_text.see(tk.END)
+
+    def insert_log_message(self, message):
+        """Inserta un mensaje de log en el historial de chat."""
+        self.root.after(0, self._insert_log_message, message)
+
+    def _insert_log_message(self, message):
+        self.chat_history_text.config(state='normal')
+        self.chat_history_text.insert(tk.END, f"{message}\n", 'log')
         self.chat_history_text.config(state='disabled')
         self.chat_history_text.see(tk.END)
 

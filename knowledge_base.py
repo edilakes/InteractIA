@@ -82,6 +82,25 @@ class KnowledgeBase:
             
         return self.collection.find_one({"nombre_recurso": nombre_recurso})
 
+    def conocer_habilidad_por_accion(self, nombre_accion: str):
+        """
+        Busca un documento de habilidad que contenga una acción específica por su nombre.
+
+        Args:
+            nombre_accion (str): El nombre de la acción a buscar dentro de la habilidad.
+
+        Returns:
+            dict: El documento de la habilidad si se encuentra, de lo contrario None.
+        """
+        if not self.client:
+            print("(-) No se puede consultar la habilidad, no hay conexión con la base de datos.")
+            return None
+        
+        query = {
+            "datos.acciones.nombre": nombre_accion
+        }
+        return self.collection.find_one(query)
+
     def conocer_habilidades_por_contexto(self, contextos: list):
         """
         Busca y devuelve todas las habilidades que coinciden con una lista de contextos.

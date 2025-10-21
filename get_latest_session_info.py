@@ -83,11 +83,15 @@ def get_session_logs(session_id, log_path):
         with open(log_path, 'r', encoding='utf-8') as f:
             for line in f:
                 if session_id in line:
-                    try:
-                        log_json = json.loads(line)
-                        print(f"[{log_json.get('timestamp')}] [{log_json.get('level')}] [{log_json.get('module')}:{log_json.get('function')}:{log_json.get('line')}] {log_json.get('message')}")
-                    except json.JSONDecodeError:
-                        print(line.strip()) # Imprimir la línea si no es un JSON válido
+                    line = line.strip()
+                    if line.startswith('{'):
+                        try:
+                            log_json = json.loads(line)
+                            print(f"[{log_json.get('timestamp')}] [{log_json.get('level')}] [{log_json.get('module')}:{log_json.get('function')}:{log_json.get('line')}] {log_json.get('message')}")
+                        except json.JSONDecodeError:
+                            print(f"[RAW] {line}")
+                    else:
+                        print(f"[RAW] {line}")
     except FileNotFoundError:
         print(f"Error: No se encontró el archivo de log en '{log_path}'")
     except Exception as e:
