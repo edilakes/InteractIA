@@ -19,16 +19,16 @@ def main():
 
     args, unknown = parser.parse_known_args()
 
-    # Si se ejecuta con un objetivo desde la línea de comandos (sin GUI)
-    if unknown:
+    objetivo_cli = " ".join(unknown).strip()
+
+    # Si se proporciona un objetivo en la línea de comandos, ejecutar en modo CLI
+    if objetivo_cli:
         from agente import Agente
-        # Este modo no tiene ID de ventana propio ni objetivo por ahora
         agente = Agente(callback_hablar=lambda msg: print(f"Agente: {msg}"))
-        objetivo = " ".join(unknown)
-        agente.establecer_objetivo(objetivo)
+        agente.establecer_objetivo(objetivo_cli)
         agente.stream_run()
     else:
-        # Modo GUI
+        # De lo contrario, iniciar la GUI
         id_instancia = generar_id_aleatorio()
         titulo_ventana = f"interactia-{id_instancia}"
 

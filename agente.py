@@ -81,21 +81,30 @@ class Agente:
 
 
     def establecer_objetivo(self, objetivo):
+        self.logger.info(f"Llamada a establecer_objetivo con: '{objetivo}'")
+        self.logger.info(f"Estado de 'esperando_aprobacion' antes del chequeo: {self.estado_agente.get('esperando_aprobacion')}")
+
+        if self.estado_agente.get('esperando_aprobacion'):
+            self.logger.info("Agente está esperando aprobación. La entrada se tratará como una respuesta a la propuesta de aprendizaje.")
+            self._manejar_respuesta_aprendizaje(objetivo)
+            return
+
         if objetivo.strip().lower() == '/aprender_de_historial':
             self.logger.info("Comando de meta-aprendizaje recibido.")
             threading.Thread(target=self.iniciar_ciclo_meta_aprendizaje).start()
             return
 
         self.objetivo = objetivo
-        if not self.estado_agente.get('esperando_aprobacion'):
-            self.historial_acciones = []
-            self.resultado_accion_anterior = None
+        self.logger.info(f"self.objetivo ha sido establecido a: '{self.objetivo}'")
+
+        self.historial_acciones = []
+        self.resultado_accion_anterior = None
 
         rol = 'usuario'
         contenido = {'texto': objetivo, 'adjunto': None}
         self.memoria.guardar_mensaje(self.mi_id_ventana, rol, contenido)
         self.historial_conversacion.append({'rol': rol, 'contenido': objetivo})
-        self.logger.info(f"Objetivo establecido: {self.objetivo}")
+        self.logger.info(f"Objetivo establecido y guardado en la memoria: {self.objetivo}")
 
     def observar(self):
         self.logger.info("--- Fase: Observar ---")
@@ -130,18 +139,30 @@ class Agente:
         if habilidades_disponibles:
             info_habilidades = []
             for hab in habilidades_disponibles:
-                # Solo incluimos habilidades con implementación o acciones primitivas
-                datos = hab.get("datos", {})
-                if 'modulo_implementacion' in datos or hab.get("nombre_recurso") == "habilidades_fundamentales_agente":
-                    acciones = datos.get("acciones", [])
-                    info_relevante = {
-                        "nombre_habilidad": hab.get("nombre_recurso"),
-                        "descripcion": datos.get("descripcion"),
-                        "acciones_disponibles": [{k: v for k, v in a.items() if k != 'params'} for a in acciones]
-                    }
-                    info_habilidades.append(json.dumps(info_relevante, indent=2, ensure_ascii=False))
+                datos_habilidad = hab.get("datos", {})
+                acciones_habilidad = datos_habilidad.get("acciones", [])
+                
+                if not acciones_habilidad: # Omitir habilidades sin acciones definidas
+                    continue
+
+                acciones_para_llm = []
+                for accion_def in acciones_habilidad:
+                    # Mantener todas las claves excepto 'secuencia_primitivas', que es un detalle de implementación interno.
+                    # Esto asegura que 'params' siempre se incluya para que el LLM sepa qué proporcionar.
+                    action_info = {k: v for k, v in accion_def.items() if k != 'secuencia_primitivas'}
+                    acciones_para_llm.append(action_info)
+
+                info_relevante = {
+                    "nombre_habilidad": hab.get("nombre_recurso"),
+                    "descripcion": datos_habilidad.get("descripcion"),
+                    "acciones_disponibles": acciones_para_llm
+                }
+                info_habilidades.append(json.dumps(info_relevante, indent=2, ensure_ascii=False))
             
-            contexto_habilidad = "HABILIDADES DISPONIBLES (Herramientas y Conocimiento):\n" + "\n---\n".join(info_habilidades)
+            if info_habilidades:
+                contexto_habilidad = "HABILIDADES DISPONIBLES (Herramientas y Conocimiento):\n" + "\n---\n".join(info_habilidades)
+            else:
+                contexto_habilidad = "No se encontró conocimiento aplicable en la base de datos para este contexto."
         else:
             contexto_habilidad = "No se encontró conocimiento aplicable en la base de datos para este contexto."
 
@@ -167,9 +188,10 @@ CONTEXTO DE MEMORIA RELEVANTE:
 
 TAREA PRINCIPAL:
 Tu deber es analizar la pantalla, el objetivo y el feedback para decidir la siguiente acción.
-1.  **Analiza y Planifica**: Observa la pantalla y el contexto. Si tu acción anterior falló, crea un plan alternativo.
-2.  **Decide la Próxima Acción**: Elige la siguiente acción o habilidad de alto nivel para avanzar en tu plan. No inventes acciones, usa solo las de la lista.
-3.  **Define los Parámetros**: Especifica los parámetros exactos que la acción necesita.
+1.  **Verifica si el Objetivo está Cumplido**: Si después de observar, determinas que el objetivo ya se ha conseguido, tu ÚNICA acción debe ser `finalizar`.
+2.  **Analiza y Planifica**: Si el objetivo no está cumplido, observa la pantalla y el contexto. Si tu acción anterior falló, crea un plan alternativo.
+3.  **Decide la Próxima Acción**: Elige la siguiente acción o habilidad de alto nivel para avanzar en tu plan. No inventes acciones, usa solo las de la lista.
+4.  **Define los Parámetros**: Especifica los parámetros exactos que la acción necesita.
 
 RESPUESTA (ÚNICAMENTE JSON con la siguiente estructura obligatoria):
 {{
@@ -206,70 +228,83 @@ RESPUESTA (ÚNICAMENTE JSON con la siguiente estructura obligatoria):
                 self.controlador.esperar(params.get('segundos', 1))
             else:
                 self.logger.warning(f"Acción primitiva '{accion}' desconocida.")
-                return {'exito': False, 'razon': f"Acción primitiva '{accion}' no reconocida."} 
-            return {'exito': True, 'razon': f"Acción '{accion}' ejecutada."} 
+                return {'exito': False, 'razon': f"Acción primitiva '{accion}' no reconocida."}
+            return {'exito': True, 'razon': f"Acción '{accion}' ejecutada."}
         except Exception as e:
             self.logger.error(f"ERROR al ejecutar la acción primitiva '{accion}': {e}", exc_info=True)
             return {'exito': False, 'razon': f"Excepción al ejecutar '{accion}': {e}"}
 
     def _ejecutar_habilidad(self, decision: dict):
-        accion = decision.get("accion")
-        params = decision.get("params", {})
-        self.logger.info(f"--- Ejecutando Habilidad Compleja: {accion} ---")
+        accion_actual = decision.get("accion")
+        params_actuales = decision.get("params", {})
+        self.logger.info(f"--- Ejecutando Habilidad Compleja: {accion_actual} con params {params_actuales} ---")
 
-        # Buscar la habilidad en la KB para encontrar su implementación
-        habilidad_doc = self.kb.conocer_habilidad_por_accion(accion)
-        if not habilidad_doc or "modulo_implementacion" not in habilidad_doc.get("datos", {}):
-            msg = f"No se encontró implementación para la habilidad '{accion}' en la KB."
+        # 1. Buscar la habilidad en la KB
+        habilidad_doc = self.kb.conocer_habilidad_por_accion(accion_actual)
+        if not habilidad_doc:
+            msg = f"No se encontró la habilidad '{accion_actual}' en la KB."
             self.logger.error(msg)
             return {'exito': False, 'razon': msg}
 
-        modulo_nombre = habilidad_doc["datos"]["modulo_implementacion"]
-        self.logger.info(f"Cargando habilidad '{accion}' desde el módulo '{modulo_nombre}'...")
+        # 2. Encontrar la definición de la acción específica dentro de la habilidad
+        accion_definicion = next((a for a in habilidad_doc.get("datos", {}).get("acciones", []) if a.get("nombre") == accion_actual), None)
 
-        try:
-            # Importar dinámicamente el módulo
-            modulo = importlib.import_module(modulo_nombre)
-            # Obtener la función a llamar (debe coincidir con el nombre de la acción)
-            funcion_habilidad = getattr(modulo, accion)
-        except (ImportError, AttributeError) as e:
-            msg = f"No se pudo cargar la función '{accion}' desde el módulo '{modulo_nombre}': {e}"
-            self.logger.error(msg, exc_info=True)
+        if not accion_definicion or "secuencia_primitivas" not in accion_definicion:
+            msg = f"No se encontró una 'secuencia_primitivas' para la acción '{accion_actual}' en la KB."
+            self.logger.error(msg)
             return {'exito': False, 'razon': msg}
 
-        # Inyección de dependencias: Pasar instancias del agente a la habilidad si las necesita
-        try:
-            sig = inspect.signature(funcion_habilidad)
-            if 'controlador' in sig.parameters:
-                params['controlador'] = self.controlador
-            if 'vision' in sig.parameters:
-                params['vision'] = self.vision
-            if 'kb' in sig.parameters:
-                params['kb'] = self.kb
-            if 'agente' in sig.parameters:
-                params['agente'] = self
-        except Exception as e:
-            self.logger.warning(f"No se pudo inspeccionar la firma de la función '{accion}': {e}")
+        # 3. Ejecutar la secuencia de acciones
+        secuencia = accion_definicion["secuencia_primitivas"]
+        self.logger.info(f"Ejecutando secuencia de {len(secuencia)} pasos para '{accion_actual}'.")
 
+        for i, paso in enumerate(secuencia):
+            accion_paso = paso.get("accion")
+            params_paso_plantilla = paso.get("params", {})
+            
+            # Reemplazar placeholders en los parámetros de la plantilla con los parámetros de la decisión actual
+            params_paso_reales = {}
+            for key, value in params_paso_plantilla.items():
+                if isinstance(value, str):
+                    try:
+                        params_paso_reales[key] = value.format(**params_actuales)
+                    except KeyError as e:
+                        msg = f"La habilidad '{accion_actual}' no pudo formatear el parámetro '{key}' para el paso '{accion_paso}'. Faltó el parámetro de entrada: {e}"
+                        self.logger.error(msg)
+                        return {'exito': False, 'razon': msg}
+                else:
+                    params_paso_reales[key] = value
 
-        # Ejecutar la función de la habilidad
-        try:
-            resultado = funcion_habilidad(**params)
-            if isinstance(resultado, bool):
-                return {'exito': resultado, 'razon': f"La habilidad '{accion}' devolvió: {resultado}"}
-            elif isinstance(resultado, dict) and 'exito' in resultado and 'razon' in resultado:
-                return resultado
+            self.logger.info(f"Paso {i+1}/{len(secuencia)}: Ejecutando '{accion_paso}' con params {params_paso_reales}")
+            
+            # Determinar si el paso es una acción primitiva o una habilidad compleja
+            if accion_paso in self.habilidades_fundamentales:
+                # Es una acción primitiva
+                resultado_paso = self._ejecutar_accion_primitiva(accion_paso, params_paso_reales)
             else:
-                return {'exito': True, 'razon': f"Habilidad '{accion}' ejecutada."} 
-        except Exception as e:
-            msg = f"Excepción al ejecutar la habilidad '{accion}': {e}"
-            self.logger.error(msg, exc_info=True)
-            return {'exito': False, 'razon': msg}
+                # Es una habilidad compleja, llamarla recursivamente
+                self.logger.info(f"'{accion_paso}' es una habilidad compleja. Llamada recursiva.")
+                decision_paso = {"accion": accion_paso, "params": params_paso_reales}
+                resultado_paso = self._ejecutar_habilidad(decision_paso)
+
+            if not resultado_paso['exito']:
+                msg = f"La habilidad '{accion_actual}' falló en el paso {i+1} ('{accion_paso}'). Razón: {resultado_paso['razon']}"
+                self.logger.error(msg)
+                return {'exito': False, 'razon': msg}
+
+        msg = f"Habilidad '{accion_actual}' completada exitosamente tras {len(secuencia)} pasos."
+        self.logger.info(msg)
+        return {'exito': True, 'razon': msg}
 
 
     def stream_run(self):
         if not self.operativo or not self.objetivo:
-            self.comunicador.hablar("Error: Agente no operativo o sin objetivo.")
+            if not self.operativo:
+                self.comunicador.hablar("Error: Agente no operativo. Por favor, revisa la configuración y los logs para más detalles.")
+                self.logger.error("Agente no operativo. Verifique la configuración de API y DB, y la carga de habilidades fundamentales.")
+            elif not self.objetivo:
+                self.comunicador.hablar("Error: No se ha establecido un objetivo para el agente.")
+                self.logger.error("No se ha establecido un objetivo para el agente.")
             return
 
         self.logger.info(f"--- INICIANDO BUCLE DE EJECUCIÓN para: '{self.objetivo}' ---")
@@ -336,11 +371,17 @@ RESPUESTA (ÚNICAMENTE JSON con la siguiente estructura obligatoria):
         if accion in ["pedir_aclaracion", "hablar"]:
             mensaje = params.get('pregunta', params.get('mensaje', 'No sé qué decir.'))
             self.comunicador.hablar(mensaje)
+
         elif accion == "proponer_aprendizaje":
-            # Lógica para proponer aprendizaje
-            pass
+            nombre_habilidad = params.get('nombre_habilidad', 'habilidad_desconocida')
+            descripcion = params.get('descripcion', 'Sin descripción.')
+            self.estado_agente['esperando_aprobacion'] = True
+            self.estado_agente['propuesta_aprendizaje'] = params
+            mensaje = f"He identificado una posible nueva habilidad: '{nombre_habilidad}' ({descripcion}). ¿Quieres que la guarde en mi base de conocimiento? (responde 'si' o 'no')"
+            self.comunicador.hablar(mensaje)
+
         elif accion == "finalizar":
-            mensaje = params.get('razon', 'Tarea finalizada.')
+            mensaje = params.get('razon', 'He completado la tarea.')
             self.comunicador.hablar(f"Finalizando: {mensaje}")
 
         if mensaje:
@@ -349,7 +390,49 @@ RESPUESTA (ÚNICAMENTE JSON con la siguiente estructura obligatoria):
             self.memoria.guardar_mensaje(self.mi_id_ventana, rol, contenido)
             self.historial_conversacion.append({'rol': rol, 'contenido': mensaje})
         
-        self.resultado_accion_anterior = {'exito': True, 'razon': f"Acción de comunicación '{accion}' ejecutada."} 
+        self.resultado_accion_anterior = {'exito': True, 'razon': f"Acción de comunicación '{accion}' ejecutada."}
+
+    def _reflexionar_y_aprender(self):
+        """
+        Analiza el historial de acciones de una tarea completada y propone aprender una nueva habilidad.
+        """
+        self.logger.info("--- Fase: Reflexionar sobre el Éxito ---")
+        
+        # Construir un prompt para que el LLM analice la secuencia de acciones
+        acciones_realizadas_str = json.dumps(self.historial_acciones, indent=2)
+        prompt_reflexion = f"""
+        He completado con éxito el objetivo '{self.objetivo}'.
+        Para ello, he ejecutado la siguiente secuencia de acciones:
+        {acciones_realizadas_str}
+
+        TAREA: Analiza esta secuencia. ¿Representa una habilidad útil y generalizable?
+        - Si NO es una habilidad útil (ej. demasiado simple, muy específica, o un error), responde solo con: {{'aprender': false}}
+        - Si SÍ es una habilidad útil, responde con un JSON que la describa. Identifica las partes variables y conviértelas en parámetros.
+
+        Ejemplo de respuesta afirmativa:
+        {{
+          "aprender": true,
+          "nombre_habilidad": "buscar_archivo_en_explorador",
+          "descripcion": "Abre el explorador y busca un archivo por su nombre.",
+          "parametros_identificados": ["nombre_archivo"],
+          "secuencia_primitivas": [
+            {{"accion": "presionar_tecla", "params": {{"tecla": "win+e"}}}},
+            {{"accion": "escribir", "params": {{"texto": "{{nombre_archivo}}"}}}},
+            {{"accion": "presionar_tecla", "params": {{"tecla": "enter"}}}}
+          ]
+        }}
+
+        RESPUESTA (solo JSON):
+        """
+        
+        # Llamada al LLM (sin imagen, solo texto)
+        # Nota: llm_call necesitará una pequeña adaptación para llamadas de solo texto.
+        # Por ahora, asumimos que puede manejarlo o creamos una función wrapper.
+        decision_aprendizaje = self.llm_call(prompt_reflexion, None) # Pasamos None para la imagen
+
+        if decision_aprendizaje and decision_aprendizaje.get("aprender"):
+            self.logger.info(f"Reflexión sugiere aprender la habilidad: {decision_aprendizaje.get('nombre_habilidad')}")
+            self._ejecutar_accion_comunicacion({"accion": "proponer_aprendizaje", "params": decision_aprendizaje})
 
 
     def llm_call(self, prompt: str, captura_entorno: Image.Image):
@@ -357,28 +440,59 @@ RESPUESTA (ÚNICAMENTE JSON con la siguiente estructura obligatoria):
         with gemini_api_lock:
             self.logger.info("Bloqueo adquirido. Enviando petición al modelo de IA...")
             try:
-                contenido = [prompt, captura_entorno]
+                contenido = [prompt]
+                if captura_entorno:
+                    contenido.append(captura_entorno)
+                
                 respuesta = self.modelo.generate_content(contenido)
                 self.logger.debug(f"Respuesta cruda del modelo: {respuesta.text}")
 
                 # Extraer el bloque JSON usando una expresión regular más robusta
-                match = re.search(r'\{.*?\}', respuesta.text, re.DOTALL)
+                match = re.search(r'\{.*\}', respuesta.text, re.DOTALL)
                 if match:
                     json_text = match.group(0)
                 else:
-                    json_text = respuesta.text.strip()
+                    raise json.JSONDecodeError("No se encontró un objeto JSON en la respuesta.", respuesta.text, 0)
 
                 decision = json.loads(json_text)
                 return decision
             except json.JSONDecodeError as e:
-                error_msg = f"Error de parseo en la respuesta del modelo: {e}. Respuesta cruda: '{respuesta.text}'"
-                self.logger.error(f"ERROR al parsear JSON: {error_msg}")
-                return {"accion": None, "razon": error_msg}
+                error_msg = f"Error de parseo en la respuesta del modelo. Respuesta cruda: '{respuesta.text}'"
+                self.logger.error(f"ERROR al parsear JSON: {e}. {error_msg}")
+                return {"accion": None, "razon": f"JSONDecodeError: {error_msg}"}
             except Exception as e:
                 self.logger.error(f"ERROR al llamar al modelo de IA: {e}", exc_info=True)
-                return {"accion": None, "razon": "Error en el módulo de decisión al llamar a la API."}
+                return {"accion": None, "razon": f"Error en el módulo de decisión al llamar a la API: {e}"}
 
-    # --- MÉTODOS DE APRENDIZAJE (Sin cambios) ---
+    def _manejar_respuesta_aprendizaje(self, respuesta_usuario: str):
+        """Gestiona la respuesta 'si' o 'no' del usuario a una propuesta de aprendizaje."""
+        propuesta = self.estado_agente.get('propuesta_aprendizaje')
+        if not propuesta:
+            return
+
+        if 'si' in respuesta_usuario.lower():
+            nombre_recurso = f"habilidad_{propuesta.get('nombre_habilidad')}"
+            datos_habilidad = {
+                "descripcion": f"Habilidad aprendida autónomamente para: {propuesta.get('descripcion')}",
+                "contexto_aplicacion": ["General"], # Se puede mejorar para detectar contexto
+                "acciones": [
+                    {
+                        "nombre": propuesta.get('nombre_habilidad'),
+                        "descripcion": propuesta.get('descripcion'),
+                        "params": [{"nombre": p} for p in propuesta.get("parametros_identificados", [])],
+                        "secuencia_primitivas": propuesta.get('secuencia_primitivas')
+                    }
+                ]
+            }
+            self.kb.aprender_habilidad(nombre_recurso, "Habilidad Compleja Autónoma", datos_habilidad)
+            self.comunicador.hablar(f"¡Genial! He guardado la nueva habilidad '{propuesta.get('nombre_habilidad')}' en mi memoria.")
+        else:
+            self.comunicador.hablar("Entendido. Descartaré la propuesta.")
+
+        # Limpiar el estado
+        self.estado_agente['esperando_aprobacion'] = False
+        self.estado_agente['propuesta_aprendizaje'] = None
+
     def _publicar_estado(self, decision: dict, estado_bucle: str): pass
     def iniciar_ciclo_meta_aprendizaje(self): pass
 
