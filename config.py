@@ -6,9 +6,6 @@ load_dotenv()
 
 # --- Credenciales y Endpoints ---
 
-# Clave de API para el servicio de Google Gemini
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-
 # URI de conexión para la base de datos MongoDB
 MONGO_URI = os.getenv("MONGO_URI")
 
@@ -30,10 +27,8 @@ MONGODB_SESIONES_ANALIZADAS_COLLECTION = "sesiones_analizadas"
 CHAT_HISTORY_LENGTH = 20
 
 # --- Configuraciones del Agente ---
+# (La configuración del modelo de IA ahora se gestiona a través de models.json)
 
-# Modelo de Gemini a utilizar para la toma de decisiones
-# Es importante elegir uno que sea multimodal (acepte imágenes y texto)
-GEMINI_MODEL_NAME = "models/gemini-2.5-flash"
 
 # --- Verificación de configuración ---
 
@@ -43,11 +38,8 @@ def verificar_configuracion():
     """
     print("Verificando la configuración de la aplicación...")
     
-    if not GEMINI_API_KEY or "SU_API_KEY" in GEMINI_API_KEY:
-        print("(-) ADVERTENCIA: La variable de entorno GEMINI_API_KEY no está configurada.")
-        return False
-    else:
-        print("(+) La API Key de Gemini está cargada.")
+    # La verificación de la API key del modelo se hará al cargar el proveedor específico.
+    # Esto permite que diferentes modelos usen diferentes variables de entorno.
 
     if not MONGO_URI or "SU_CADENA_DE_CONEXION" in MONGO_URI:
         print("(-) ADVERTENCIA: La variable de entorno MONGO_URI no está configurada.")
@@ -55,7 +47,7 @@ def verificar_configuracion():
     else:
         print("(+) La URI de MongoDB está cargada.")
     
-    print("\nConfiguración cargada correctamente.")
+    print("\nConfiguración base cargada correctamente.")
     return True
 
 if __name__ == "__main__":

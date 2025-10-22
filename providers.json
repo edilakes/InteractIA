@@ -1,0 +1,10 @@
+[
+  {
+    "id": "google-gemini-default",
+    "name": "Google Gemini (Default)",
+    "provider_type": "gemini",
+    "config": {
+      "api_key_env": "GEMINI_API_KEY"
+    }
+  }
+]
