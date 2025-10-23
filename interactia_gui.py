@@ -3,7 +3,7 @@ from tkinter import ttk, messagebox
 import threading
 
 from agente import Agente
-from model_manager import load_providers_from_file, get_model_provider
+from model_manager import load_providers_from_file, get_model_provider, get_default_provider_config, _update_last_used_model
 from gui_model_manager import ProviderManagerWindow
 
 class InteractIAGUI:
@@ -18,7 +18,7 @@ class InteractIAGUI:
         self.providers_config = []
         self.selected_provider_config = None
         self.active_provider = None
-        self.available_models = []
+        # self.available_models = [] # No longer needed as models are in provider_config
         self.selected_model = None
         self.agente = None
         self._agent_writing = False
@@ -80,46 +80,77 @@ class InteractIAGUI:
         if not self.providers_config:
             self.show_error_and_exit("No se encontraron proveedores en providers.json.")
             return
+        
         provider_names = [p['name'] for p in self.providers_config]
         self.provider_selector['values'] = provider_names
-        self.provider_selector.set(provider_names[0])
-        self._on_provider_selected(None) # Iniciar la carga del primer proveedor
+
+        # Get the default/last used provider and model
+        default_provider_config, default_model_name = get_default_provider_config()
+        
+        # Set the provider selector
+        self.provider_selector.set(default_provider_config['name'])
+        self.selected_provider_config = default_provider_config
+
+        # Populate and set the model selector
+        self._update_models_dropdown(default_model_name)
+        
+        # Initialize agent with the default/last used model
+        self._initialize_agent()
 
     def _on_provider_selected(self, event):
         selected_name = self.provider_selector.get()
         self.selected_provider_config = next(p for p in self.providers_config if p['name'] == selected_name)
-        self.insert_log_message(f"Proveedor seleccionado: {selected_name}. Obteniendo modelos...")
-        self.model_selector.set("Cargando...")
-        self.model_selector.config(state="disabled")
-        self.agente = None # Desactivar agente mientras se cambia de modelo
-        threading.Thread(target=self._load_models_for_provider, daemon=True).start()
+        self.insert_log_message(f"Proveedor seleccionado: {selected_name}. Cargando modelos...")
+        
+        # Populate and set the model selector based on the selected provider's available_models
+        # Try to find the last used model for this provider, otherwise select the first
+        last_used_model_name = None
+        if "available_models" in self.selected_provider_config:
+            for model in self.selected_provider_config["available_models"]:
+                if model.get("is_last_used"):
+                    last_used_model_name = model["name"]
+                    break
+        
+        self._update_models_dropdown(last_used_model_name)
+        self._initialize_agent() # Re-initialize agent with the new provider/model
 
-    def _load_models_for_provider(self):
-        try:
-            self.active_provider = get_model_provider(self.selected_provider_config)
-            self.available_models = self.active_provider.list_models()
-            self.root.after(0, self._update_models_dropdown)
-        except Exception as e:
-            self.root.after(0, lambda: self.show_error_and_exit(f"Error al cargar modelos del proveedor: {e}"))
+    # Removed _load_models_for_provider as models are loaded statically
 
-    def _update_models_dropdown(self):
-        if self.available_models:
-            self.model_selector['values'] = self.available_models
+    def _update_models_dropdown(self, model_to_select: str = None):
+        available_models_names = [model["name"] for model in self.selected_provider_config.get("available_models", [])]
+        
+        if available_models_names:
+            self.model_selector['values'] = available_models_names
             self.model_selector.config(state="readonly")
-            self.model_selector.set(self.available_models[0])
-            self._on_model_selected(None)
+            
+            if model_to_select and model_to_select in available_models_names:
+                self.model_selector.set(model_to_select)
+            else:
+                self.model_selector.set(available_models_names[0]) # Default to first model
+            
+            self.selected_model = self.model_selector.get() # Update selected_model
+            # No need to call _on_model_selected here, as it will be called after agent init
         else:
             self.model_selector.set("No se encontraron modelos")
+            self.model_selector.config(state="disabled")
+            self.selected_model = None
 
     def _on_model_selected(self, event):
         self.selected_model = self.model_selector.get()
         if self.selected_model and self.selected_model != "Cargando...":
+            # Persist the selected model as last used
+            _update_last_used_model(self.selected_provider_config["id"], self.selected_model)
             self._initialize_agent()
 
     def _initialize_agent(self):
-        if not self.active_provider or not self.selected_model:
+        if not self.selected_provider_config or not self.selected_model:
             return
         try:
+            # get_model_provider now returns an initialized provider instance
+            # We need to ensure the correct model is set on it.
+            self.active_provider = get_model_provider(self.selected_provider_config)
+            self.active_provider.set_model(self.selected_model)
+
             self.agente = Agente(
                 model_provider=self.active_provider,
                 model_name=self.selected_model,
@@ -135,7 +166,7 @@ class InteractIAGUI:
 
     def _open_provider_manager_window(self):
         # El nombre de la config en gui_model_manager.py es `models_config`, hay que pasarlo así
-        ProviderManagerWindow(self, providers_config=self.providers_config)
+        ProviderManagerWindow(self.root, providers_config=self.providers_config)
 
     def show_error_and_exit(self, message):
         messagebox.showerror("Error Crítico", message, parent=self.root)

@@ -5,6 +5,164 @@
     "provider_type": "gemini",
     "config": {
       "api_key_env": "GEMINI_API_KEY"
-    }
+    },
+    "available_models": [
+      {
+        "name": "models/gemini-2.5-pro-preview-03-25",
+        "is_last_used": false
+      },
+      {
+        "name": "models/gemini-2.5-flash-preview-05-20",
+        "is_last_used": false
+      },
+      {
+        "name": "models/gemini-2.5-flash",
+        "is_last_used": true
+      },
+      {
+        "name": "models/gemini-2.5-flash-lite-preview-06-17",
+        "is_last_used": false
+      },
+      {
+        "name": "models/gemini-2.5-pro-preview-05-06",
+        "is_last_used": false
+      },
+      {
+        "name": "models/gemini-2.5-pro-preview-06-05",
+        "is_last_used": false
+      },
+      {
+        "name": "models/gemini-2.5-pro",
+        "is_last_used": false
+      },
+      {
+        "name": "models/gemini-2.0-flash-exp",
+        "is_last_used": false
+      },
+      {
+        "name": "models/gemini-2.0-flash",
+        "is_last_used": false
+      },
+      {
+        "name": "models/gemini-2.0-flash-001",
+        "is_last_used": false
+      },
+      {
+        "name": "models/gemini-2.0-flash-lite-001",
+        "is_last_used": false
+      },
+      {
+        "name": "models/gemini-2.0-flash-lite",
+        "is_last_used": false
+      },
+      {
+        "name": "models/gemini-2.0-flash-lite-preview-02-05",
+        "is_last_used": false
+      },
+      {
+        "name": "models/gemini-2.0-flash-lite-preview",
+        "is_last_used": false
+      },
+      {
+        "name": "models/gemini-2.0-pro-exp",
+        "is_last_used": false
+      },
+      {
+        "name": "models/gemini-2.0-pro-exp-02-05",
+        "is_last_used": false
+      },
+      {
+        "name": "models/gemini-exp-1206",
+        "is_last_used": false
+      },
+      {
+        "name": "models/gemini-2.0-flash-thinking-exp-01-21",
+        "is_last_used": false
+      },
+      {
+        "name": "models/gemini-2.0-flash-thinking-exp",
+        "is_last_used": false
+      },
+      {
+        "name": "models/gemini-2.0-flash-thinking-exp-1219",
+        "is_last_used": false
+      },
+      {
+        "name": "models/gemini-2.5-flash-preview-tts",
+        "is_last_used": false
+      },
+      {
+        "name": "models/gemini-2.5-pro-preview-tts",
+        "is_last_used": false
+      },
+      {
+        "name": "models/learnlm-2.0-flash-experimental",
+        "is_last_used": false
+      },
+      {
+        "name": "models/gemma-3-1b-it",
+        "is_last_used": false
+      },
+      {
+        "name": "models/gemma-3-4b-it",
+        "is_last_used": false
+      },
+      {
+        "name": "models/gemma-3-12b-it",
+        "is_last_used": false
+      },
+      {
+        "name": "models/gemma-3-27b-it",
+        "is_last_used": false
+      },
+      {
+        "name": "models/gemma-3n-e4b-it",
+        "is_last_used": false
+      },
+      {
+        "name": "models/gemma-3n-e2b-it",
+        "is_last_used": false
+      },
+      {
+        "name": "models/gemini-flash-latest",
+        "is_last_used": false
+      },
+      {
+        "name": "models/gemini-flash-lite-latest",
+        "is_last_used": false
+      },
+      {
+        "name": "models/gemini-pro-latest",
+        "is_last_used": false
+      },
+      {
+        "name": "models/gemini-2.5-flash-lite",
+        "is_last_used": false
+      },
+      {
+        "name": "models/gemini-2.5-flash-image-preview",
+        "is_last_used": false
+      },
+      {
+        "name": "models/gemini-2.5-flash-image",
+        "is_last_used": false
+      },
+      {
+        "name": "models/gemini-2.5-flash-preview-09-2025",
+        "is_last_used": false
+      },
+      {
+        "name": "models/gemini-2.5-flash-lite-preview-09-2025",
+        "is_last_used": false
+      },
+      {
+        "name": "models/gemini-robotics-er-1.5-preview",
+        "is_last_used": false
+      },
+      {
+        "name": "models/gemini-2.5-computer-use-preview-10-2025",
+        "is_last_used": false
+      }
+    ]
   }
 ]

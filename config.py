@@ -29,7 +29,6 @@ CHAT_HISTORY_LENGTH = 20
 # --- Configuraciones del Agente ---
 # (La configuración del modelo de IA ahora se gestiona a través de models.json)
 
-
 # --- Verificación de configuración ---
 
 def verificar_configuracion():
