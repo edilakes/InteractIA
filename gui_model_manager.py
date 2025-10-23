@@ -3,7 +3,8 @@ from tkinter import ttk, messagebox
 import json
 import threading
 
-from model_manager import refresh_provider_models, load_providers_from_file, get_model_provider, _update_last_used_model
+from model_manager import refresh_provider_models, load_providers_from_db, get_model_provider, _update_last_used_model
+from provider_db_manager import provider_db_manager # Import the manager for direct DB operations
 
 class ProviderEditDialog(tk.Toplevel):
     """Diálogo para añadir o editar una configuración de proveedor."""
@@ -62,6 +63,7 @@ class ProviderManagerWindow(tk.Toplevel):
     """Ventana para gestionar las configuraciones de proveedores de IA.""" 
     def __init__(self, parent, providers_config: list):
         super().__init__(parent)
+        print("DEBUG: ProviderManagerWindow.__init__ started")
         self.transient(parent)
         self.title("Gestionar Proveedores de IA")
         self.geometry("600x500") # Adjusted geometry for two listboxes
@@ -114,13 +116,14 @@ class ProviderManagerWindow(tk.Toplevel):
 
         self.refresh_models_button = ttk.Button(self.button_frame, text="Refrescar Modelos", command=self.refresh_models_for_selected_provider, state="disabled")
         self.refresh_models_button.pack(side="left", padx=5)
+        print("DEBUG: self.refresh_models_button initialized.")
 
         ttk.Button(self.button_frame, text="Cerrar", command=self.on_close).pack(side="right", padx=5)
 
         self.refresh_listbox()
 
     def refresh_listbox(self):
-        self.providers_config = load_providers_from_file() # Reload providers config
+        self.providers_config = load_providers_from_db() # Reload providers config from DB
         self.providers_listbox.delete(0, tk.END)
         
         if not self.providers_config:
@@ -178,10 +181,10 @@ class ProviderManagerWindow(tk.Toplevel):
         self._set_button_states(True)
 
     def _perform_initial_refresh_and_select(self, provider_id, selected_provider_idx):
+        print("DEBUG: _perform_initial_refresh_and_select started.")
         try:
             refresh_provider_models(provider_id)
-            # Reload providers_config after refresh
-            self.providers_config = load_providers_from_file()
+            self.providers_config = load_providers_from_db() # Reload providers_config after refresh
             current_provider_config = self.providers_config[selected_provider_idx]
 
             # Select the first model in the newly refreshed list as last used
@@ -198,6 +201,7 @@ class ProviderManagerWindow(tk.Toplevel):
             self.parent.after(0, lambda: messagebox.showerror("Error", f"Error en el refresco inicial en segundo plano: {e}", parent=self))
 
     def _update_ui_after_initial_refresh(self, selected_provider_idx, selected_model_name):
+        print("DEBUG: _update_ui_after_initial_refresh started.")
         self.providers_listbox.selection_set(selected_provider_idx)
         self._update_models_display(selected_provider_idx, selected_model_name)
         self._set_button_states(True)
@@ -206,6 +210,7 @@ class ProviderManagerWindow(tk.Toplevel):
         messagebox.showinfo("Configuración Inicial", "Modelos refrescados y configurados correctamente.", parent=self)
 
     def _update_models_display(self, provider_idx, model_to_select_name=None):
+        print("DEBUG: _update_models_display started.")
         self.models_listbox.delete(0, tk.END)
         selected_provider = self.providers_config[provider_idx]
         if "available_models" in selected_provider and selected_provider["available_models"]:
@@ -216,12 +221,14 @@ class ProviderManagerWindow(tk.Toplevel):
                     self.models_listbox.see(i)
 
     def _set_button_states(self, enable: bool):
+        print(f"DEBUG: _set_button_states called with enable={enable}")
         state = "normal" if enable else "disabled"
         self.edit_button.config(state=state)
         self.delete_button.config(state=state)
         self.refresh_models_button.config(state=state)
 
     def _on_list_select(self, event):
+        print("DEBUG: _on_list_select started.")
         cur_selection = self.providers_listbox.curselection()
         if cur_selection:
             idx = cur_selection[0]
@@ -232,6 +239,7 @@ class ProviderManagerWindow(tk.Toplevel):
             self._set_button_states(False)
 
     def _on_model_list_select(self, event):
+        print("DEBUG: _on_model_list_select started.")
         # This method is called when a model is selected in the models_listbox
         # We need to update the is_last_used flag in providers.json
         cur_provider_selection = self.providers_listbox.curselection()
@@ -248,16 +256,20 @@ class ProviderManagerWindow(tk.Toplevel):
                 self.parent.reload_providers_config()
 
     def add_provider(self):
+        print("DEBUG: add_provider started.")
         dialog = ProviderEditDialog(self)
         if dialog.result:
             # Ensure new provider has an empty available_models list
             if "available_models" not in dialog.result:
                 dialog.result["available_models"] = []
-            self.providers_config.append(dialog.result)
+            # Insert into DB
+            provider_db_manager.insert_provider(dialog.result)
             self.refresh_listbox()
 
     def edit_provider(self):
+        print("DEBUG: edit_provider started.")
         idx = self.providers_listbox.curselection()[0]
+        original_provider_id = self.providers_config[idx]["id"]
         dialog = ProviderEditDialog(self, provider_data=self.providers_config[idx])
         if dialog.result:
             # Preserve available_models if not explicitly set in dialog.result
@@ -265,18 +277,23 @@ class ProviderManagerWindow(tk.Toplevel):
                 dialog.result["available_models"] = self.providers_config[idx]["available_models"]
             elif "available_models" not in dialog.result:
                 dialog.result["available_models"] = []
-            self.providers_config[idx] = dialog.result
+            # Update in DB
+            provider_db_manager.update_provider(original_provider_id, dialog.result)
             self.refresh_listbox()
 
     def delete_provider(self):
+        print("DEBUG: delete_provider started.")
         idx = self.providers_listbox.curselection()[0]
-        if messagebox.askyesno("Confirmar", f"¿Seguro que quieres eliminar '{self.providers_config[idx]['name']}'?", parent=self):
-            del self.providers_config[idx]
+        provider_to_delete = self.providers_config[idx]
+        if messagebox.askyesno("Confirmar", f"¿Seguro que quieres eliminar '{provider_to_delete['name']}'?", parent=self):
+            # Delete from DB
+            provider_db_manager.delete_provider(provider_to_delete["id"])
             self.refresh_listbox()
 
     def on_close(self):
+        print("DEBUG: on_close started.")
         try:
-            # No need to write providers.json here, as _update_last_used_model and refresh_provider_models handle it
+            # No need to write providers.json here, as DB manager handles it
             if hasattr(self.parent, "reload_providers_config"):
                 self.parent.reload_providers_config()
         except Exception as e:
@@ -284,6 +301,7 @@ class ProviderManagerWindow(tk.Toplevel):
         self.destroy()
 
     def refresh_models_for_selected_provider(self):
+        print("DEBUG: refresh_models_for_selected_provider started.")
         cur_selection = self.providers_listbox.curselection()
         if not cur_selection:
             return
@@ -303,14 +321,16 @@ class ProviderManagerWindow(tk.Toplevel):
             messagebox.showwarning("Advertencia", "El proveedor seleccionado no tiene un ID.", parent=self)
 
     def _perform_refresh_and_update_ui(self, provider_id, provider_idx):
+        print("DEBUG: _perform_refresh_and_update_ui started.")
         try:
             refresh_provider_models(provider_id)
-            self.providers_config = load_providers_from_file() # Reload config after refresh
+            self.providers_config = load_providers_from_db() # Reload config after refresh
             self.parent.after(0, lambda: self._update_ui_after_refresh(provider_idx))
         except Exception as e:
             self.parent.after(0, lambda: messagebox.showerror("Error", f"Error al refrescar modelos en segundo plano: {e}", parent=self))
 
     def _update_ui_after_refresh(self, provider_idx):
+        print("DEBUG: _update_ui_after_refresh started.")
         # Re-select the provider in the listbox to trigger models list update
         self.providers_listbox.selection_clear(0, tk.END)
         self.providers_listbox.selection_set(provider_idx)

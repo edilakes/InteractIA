@@ -23,6 +23,9 @@ MONGODB_OPORTUNIDADES_COLLECTION = "oportunidades_aprendizaje"
 # Nombre de la colección para registrar sesiones de chat ya analizadas
 MONGODB_SESIONES_ANALIZADAS_COLLECTION = "sesiones_analizadas"
 
+# Nombre de la colección para las configuraciones de proveedores de modelos de IA
+MONGODB_PROVIDERS_COLLECTION = "providers_config"
+
 # Número de mensajes a recuperar del historial de chat
 CHAT_HISTORY_LENGTH = 20
 

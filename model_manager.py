@@ -5,15 +5,17 @@ import json
 import re
 from PIL import Image
 
-# Helper function to write providers data to file
-def _write_providers_to_file(providers_data: list, file_path: str = 'providers.json'):
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    absolute_file_path = os.path.join(script_dir, file_path)
-    try:
-        with open(absolute_file_path, 'w', encoding='utf-8') as f:
-            json.dump(providers_data, f, indent=2)
-    except IOError as e:
-        print(f"ERROR al escribir en el archivo de proveedores '{absolute_file_path}': {e}")
+from provider_db_manager import provider_db_manager
+
+# Helper function to write providers data to file (REMOVED - now handled by DB manager)
+# def _write_providers_to_file(providers_data: list, file_path: str = 'providers.json'):
+#     script_dir = os.path.dirname(os.path.abspath(__file__))
+#     absolute_file_path = os.path.join(script_dir, file_path)
+#     try:
+#         with open(absolute_file_path, 'w', encoding='utf-8') as f:
+#             json.dump(providers_data, f, indent=2)
+#     except IOError as e:
+#         print(f"ERROR al escribir en el archivo de proveedores '{absolute_file_path}': {e}")
 
 class ModelProvider(abc.ABC):
     """Clase base abstracta para cualquier proveedor de modelos de IA."""
@@ -101,37 +103,35 @@ class GeminiProvider(ModelProvider):
         try:
             current_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
             
-            # Cargar la configuración actual de providers.json
-            script_dir = os.path.dirname(os.path.abspath(__file__))
-            absolute_file_path = os.path.join(script_dir, 'providers.json')
-            with open(absolute_file_path, 'r', encoding='utf-8') as f:
-                providers_data = json.load(f)
+            # Get the current provider config from DB
+            provider_config = provider_db_manager.get_provider_by_id(self.provider_id)
+            if not provider_config:
+                print(f"ADVERTENCIA: No se encontró el proveedor '{self.provider_id}' en la base de datos para refrescar modelos.")
+                return
 
-            for provider_config in providers_data:
-                if provider_config.get("id") == self.provider_id:
-                    # Preservar el estado de is_last_used si el modelo sigue existiendo
-                    old_available_models = provider_config.get("available_models", [])
-                    new_available_models = []
-                    last_used_model_name = None
+            # Preservar el estado de is_last_used si el modelo sigue existiendo
+            old_available_models = provider_config.get("available_models", [])
+            new_available_models = []
+            last_used_model_name = None
 
-                    for old_model in old_available_models:
-                        if old_model.get("is_last_used"):
-                            last_used_model_name = old_model.get("name")
-                            break
-
-                    for model_name in current_models:
-                        is_last_used = (model_name == last_used_model_name)
-                        new_available_models.append({"name": model_name, "is_last_used": is_last_used})
-                    
-                    # Si el last_used_model ya no existe, o no había uno, marcar el primero como last_used
-                    if not any(model.get("is_last_used") for model in new_available_models) and new_available_models:
-                        new_available_models[0]["is_last_used"] = True
-
-                    provider_config["available_models"] = new_available_models
+            for old_model in old_available_models:
+                if old_model.get("is_last_used"):
+                    last_used_model_name = old_model.get("name")
                     break
+
+            for model_name in current_models:
+                is_last_used = (model_name == last_used_model_name)
+                new_available_models.append({"name": model_name, "is_last_used": is_last_used})
             
-            _write_providers_to_file(providers_data)
-            print(f"Modelos para {self.provider_id} actualizados correctamente.")
+            # Si el last_used_model ya no existe, o no había uno, marcar el primero como last_used
+            if not any(model.get("is_last_used") for model in new_available_models) and new_available_models:
+                new_available_models[0]["is_last_used"] = True
+
+            provider_config["available_models"] = new_available_models
+            
+            # Update the provider in the database
+            provider_db_manager.update_provider(self.provider_id, provider_config)
+            print(f"Modelos para {self.provider_id} actualizados correctamente en la base de datos.")
 
         except Exception as e:
             print(f"ERROR al refrescar modelos para {self.provider_id}: {e}")
@@ -143,52 +143,43 @@ _PROVIDER_MAP = {
 }
 
 def _update_last_used_model(provider_id: str, model_name: str):
-    """Actualiza el flag is_last_used para el modelo y proveedor especificados en providers.json."""
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    absolute_file_path = os.path.join(script_dir, 'providers.json')
+    """Actualiza el flag is_last_used para el modelo y proveedor especificados en la base de datos."""
     try:
-        with open(absolute_file_path, 'r', encoding='utf-8') as f:
-            providers_data = json.load(f)
+        provider_config = provider_db_manager.get_provider_by_id(provider_id)
+        if not provider_config:
+            print(f"ADVERTENCIA: No se encontró el proveedor '{provider_id}' en la base de datos para actualizar el estado de último usado.")
+            return
 
         found = False
-        for provider_config in providers_data:
-            if provider_config.get("id") == provider_id:
-                if "available_models" in provider_config:
-                    for model in provider_config["available_models"]:
-                        if model.get("name") == model_name:
-                            model["is_last_used"] = True
-                            found = True
-                        else:
-                            model["is_last_used"] = False
-                break
+        if "available_models" in provider_config:
+            for model in provider_config["available_models"]:
+                if model.get("name") == model_name:
+                    model["is_last_used"] = True
+                    found = True
+                else:
+                    model["is_last_used"] = False
         
         if found:
-            _write_providers_to_file(providers_data)
+            provider_db_manager.update_provider(provider_id, provider_config)
         else:
             print(f"ADVERTENCIA: No se encontró el modelo '{model_name}' para el proveedor '{provider_id}' al intentar actualizar el estado de último usado.")
 
-    except (FileNotFoundError, json.JSONDecodeError) as e:
-        print(f"ERROR al actualizar el estado de último modelo usado: {e}")
+    except Exception as e:
+        print(f"ERROR al actualizar el estado de último modelo usado en la base de datos: {e}")
 
-def load_providers_from_file(file_path: str = 'providers.json') -> list:
-    """Carga la lista de configuraciones de proveedores desde un archivo JSON."""
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    absolute_file_path = os.path.join(script_dir, file_path)
+def load_providers_from_db() -> list:
+    """Carga la lista de configuraciones de proveedores desde la base de datos."""
     try:
-        with open(absolute_file_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except FileNotFoundError:
-        print(f"ADVERTENCIA: El archivo '{absolute_file_path}' no fue encontrado.")
-        return []
-    except json.JSONDecodeError:
-        print(f"ERROR: El archivo '{absolute_file_path}' tiene un formato JSON inválido.")
+        return provider_db_manager.get_all_providers()
+    except Exception as e:
+        print(f"ERROR al cargar proveedores desde la base de datos: {e}")
         return []
 
 def get_default_provider_config() -> tuple[dict, str]:
     """Obtiene la configuración del proveedor y el nombre del modelo por defecto o el último usado."""
-    providers = load_providers_from_file()
+    providers = load_providers_from_db()
     if not providers:
-        raise RuntimeError("No se encontraron configuraciones de proveedores.")
+        raise RuntimeError("No se encontraron configuraciones de proveedores en la base de datos.")
 
     default_provider_config = None
     default_model_name = None
@@ -245,19 +236,16 @@ def refresh_provider_models(provider_id: str):
     """Refresca la lista de modelos disponibles para un proveedor específico.
     Esta función puede ser llamada desde la GUI para actualizar los modelos.
     """
-    providers_data = load_providers_from_file()
-    target_provider_config = None
-    for p_config in providers_data:
-        if p_config.get("id") == provider_id:
-            target_provider_config = p_config
-            break
-
-    if target_provider_config:
-        try:
-            # Crear una instancia temporal del proveedor para llamar a refresh_available_models
-            provider_instance = get_model_provider(provider_config=target_provider_config)
-            provider_instance.refresh_available_models()
-        except Exception as e:
-            print(f"ERROR al intentar refrescar modelos para el proveedor {provider_id}: {e}")
-    else:
+    # Get the provider instance to call its refresh_available_models method
+    # We need to load the provider config from DB first
+    provider_config = provider_db_manager.get_provider_by_id(provider_id)
+    if not provider_config:
         print(f"ADVERTENCIA: No se encontró el proveedor con ID '{provider_id}' para refrescar modelos.")
+        return
+
+    try:
+        # Create a temporary instance of the provider to call refresh_available_models
+        provider_instance = get_model_provider(provider_config=provider_config)
+        provider_instance.refresh_available_models()
+    except Exception as e:
+        print(f"ERROR al intentar refrescar modelos para el proveedor {provider_id}: {e}")

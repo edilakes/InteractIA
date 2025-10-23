@@ -171,6 +171,7 @@ CONTEXTO DE MEMORIA RELEVANTE:
 
 TAREA PRINCIPAL:
 Tu deber es analizar la pantalla, el objetivo y el feedback para decidir la siguiente acción.
+Si el objetivo actual puede ser satisfecho completamente con una respuesta verbal o si el usuario te pide explícitamente que "hables" o "respondas hablando", debes priorizar la acción "hablar". Si la tarea ha sido completada y solo necesitas informar, usa la acción "finalizar".
 
 RESPUESTA (ÚNICAMENTE JSON con la siguiente estructura obligatoria):
 {{
@@ -178,6 +179,9 @@ RESPUESTA (ÚNICAMENTE JSON con la siguiente estructura obligatoria):
   "accion": "<nombre_de_la_accion_o_habilidad>",
   "params": {{ "<nombre_param>": "<valor_param>" }}
 }}
+Ejemplos de acciones de comunicación:
+- Para responder verbalmente: {{"accion": "hablar", "params": {{"mensaje": "Aquí está la información solicitada."}}}}
+- Para finalizar una tarea con un mensaje: {{"accion": "finalizar", "params": {{"razon": "La tarea de buscar información ha sido completada."}}}}
 '''
         return prompt
 
@@ -207,8 +211,8 @@ RESPUESTA (ÚNICAMENTE JSON con la siguiente estructura obligatoria):
                 self.controlador.esperar(params.get('segundos', 1))
             else:
                 self.logger.warning(f"Acción primitiva '{accion}' desconocida.")
-                return {'exito': False, 'razon': f"Acción primitiva '{accion}' no reconocida."} 
-            return {'exito': True, 'razon': f"Acción '{accion}' ejecutada."} 
+                return {'exito': False, 'razon': f"Acción primitiva '{accion}' no reconocida."}
+            return {'exito': True, 'razon': f"Acción '{accion}' ejecutada."}
         except Exception as e:
             self.logger.error(f"ERROR al ejecutar la acción primitiva '{accion}': {e}", exc_info=True)
             return {'exito': False, 'razon': f"Excepción al ejecutar '{accion}': {e}"}
@@ -238,7 +242,7 @@ RESPUESTA (ÚNICAMENTE JSON con la siguiente estructura obligatoria):
                 resultado_paso = self._ejecutar_habilidad({"accion": accion_paso, "params": params_paso_reales})
             if not resultado_paso['exito']:
                 return {'exito': False, 'razon': f"La habilidad '{accion_actual}' falló en el paso {i+1} ('{accion_paso}'). Razón: {resultado_paso['razon']}"}
-        return {'exito': True, 'razon': f"Habilidad '{accion_actual}' completada."} 
+        return {'exito': True, 'razon': f"Habilidad '{accion_actual}' completada."}
 
     def stream_run(self):
         if not self.operativo or not self.objetivo:
@@ -254,6 +258,16 @@ RESPUESTA (ÚNICAMENTE JSON con la siguiente estructura obligatoria):
             decision = self.pensar(estado_observado)
             self.logger.info(f"Decisión del modelo: {decision.get('accion')}, Params: {decision.get('params')}")
             accion = decision.get("accion")
+            pensamiento = decision.get("pensamiento", "").lower()
+
+            # --- Nuevo: Forzar finalizar si el pensamiento indica tarea completada ---
+            if ("tarea completada" in pensamiento or "objetivo alcanzado" in pensamiento) and accion != "finalizar":
+                self.logger.info("Pensamiento indica tarea completada, forzando acción 'finalizar'.")
+                decision["accion"] = "finalizar"
+                decision["params"] = {"razon": "Tarea completada según el pensamiento del agente."}
+                accion = "finalizar"
+            # --- Fin Nuevo ---
+
             if not accion:
                 self.resultado_accion_anterior = {'exito': False, 'razon': decision.get('razon', 'El modelo no devolvió una acción.')}
                 self.logger.error(self.resultado_accion_anterior['razon'])
@@ -301,7 +315,7 @@ RESPUESTA (ÚNICAMENTE JSON con la siguiente estructura obligatoria):
             contenido = {'texto': mensaje, 'adjunto': None}
             self.memoria.guardar_mensaje(self.mi_id_ventana, rol, contenido)
             self.historial_conversacion.append({'rol': rol, 'contenido': mensaje})
-        self.resultado_accion_anterior = {'exito': True, 'razon': f"Acción de comunicación '{accion}' ejecutada."} 
+        self.resultado_accion_anterior = {'exito': True, 'razon': f"Acción de comunicación '{accion}' ejecutada."}
 
     def _reflexionar_y_aprender(self):
         self.logger.info("--- Fase: Reflexionar sobre el Éxito ---")

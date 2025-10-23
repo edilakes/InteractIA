@@ -3,7 +3,7 @@ from tkinter import ttk, messagebox
 import threading
 
 from agente import Agente
-from model_manager import load_providers_from_file, get_model_provider, get_default_provider_config, _update_last_used_model
+from model_manager import load_providers_from_db, get_model_provider, get_default_provider_config, _update_last_used_model
 from gui_model_manager import ProviderManagerWindow
 
 class InteractIAGUI:
@@ -76,9 +76,9 @@ class InteractIAGUI:
         self.send_button.grid(row=0, column=2, padx=5)
 
     def reload_providers_config(self, initial_load=False):
-        self.providers_config = load_providers_from_file()
+        self.providers_config = load_providers_from_db()
         if not self.providers_config:
-            self.show_error_and_exit("No se encontraron proveedores en providers.json.")
+            self.show_error_and_exit("No se encontraron proveedores en la base de datos.")
             return
         
         provider_names = [p['name'] for p in self.providers_config]

@@ -6,6 +6,8 @@ import random
 import string
 import argparse
 
+from provider_db_manager import provider_db_manager # Import the global instance
+
 def generar_id_aleatorio(longitud=6):
     """Genera un ID alfanumérico aleatorio."""
     caracteres = string.ascii_lowercase + string.digits
@@ -35,6 +37,13 @@ def main():
         root = tk.Tk()
         app = InteractIAGUI(root, titulo=titulo_ventana, id_objetivo=args.supervisando_a)
         root.mainloop()
+        
+        # Close the MongoDB connection when the GUI mainloop exits
+        try:
+            provider_db_manager.close_connection()
+            print("Conexión a MongoDB cerrada.")
+        except Exception as e:
+            print(f"Error al cerrar la conexión a MongoDB: {e}")
 
 if __name__ == "__main__":
     main()
