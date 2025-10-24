@@ -45,6 +45,8 @@ class Agente:
         self.modo = 'autonomo'
         self.titulo_objetivo = None
         self.resultado_accion_anterior = None
+        self.parada_emergencia = threading.Event()
+        self.esperando_respuesta_usuario = False
 
         if id_objetivo:
             self.modo = 'controlador'
@@ -79,6 +81,10 @@ class Agente:
             self.logger.info("Habilidades fundamentales cargadas correctamente.")
             self.habilidades_fundamentales = [accion['nombre'] for accion in habilidades_fundamentales_doc['datos']['acciones']]
 
+    def detener_proceso_emergencia(self):
+        self.parada_emergencia.set()
+        self.logger.warning("¡PARADA DE EMERGENCIA ACTIVADA!")
+
     # ... (El resto de la clase no cambia)
     def _call_model(self, prompt: str, image=None) -> dict:
         self.logger.info("Esperando el bloqueo de la API del modelo...")
@@ -94,6 +100,7 @@ class Agente:
 
     def establecer_objetivo(self, objetivo):
         self.logger.info(f"Llamada a establecer_objetivo con: '{objetivo}'")
+        self.esperando_respuesta_usuario = False
         if self.estado_agente.get('esperando_aprobacion'):
             self._manejar_respuesta_aprendizaje(objetivo)
             return
@@ -103,6 +110,7 @@ class Agente:
         self.objetivo = objetivo
         self.historial_acciones = []
         self.resultado_accion_anterior = None
+        self.parada_emergencia.clear()
         rol = 'usuario'
         contenido = {'texto': objetivo, 'adjunto': None}
         self.memoria.guardar_mensaje(self.mi_id_ventana, rol, contenido)
@@ -228,6 +236,9 @@ Ejemplos de acciones de comunicación:
             return {'exito': False, 'razon': f"No se encontró una 'secuencia_primitivas' para la acción '{accion_actual}'."}
         secuencia = accion_definicion["secuencia_primitivas"]
         for i, paso in enumerate(secuencia):
+            if self.parada_emergencia.is_set():
+                self.logger.warning("Habilidad interrumpida por parada de emergencia.")
+                return {'exito': False, 'razon': 'Parada de emergencia activada.'}
             accion_paso = paso.get("accion")
             params_paso_plantilla = paso.get("params", {})
             params_paso_reales = {}
@@ -252,6 +263,14 @@ Ejemplos de acciones de comunicación:
         max_intentos = 5
         intentos = 0
         while intentos < max_intentos:
+            if self.parada_emergencia.is_set():
+                self.logger.warning("Bucle de ejecución interrumpido por parada de emergencia.")
+                self.comunicador.hablar("Proceso detenido por el usuario.")
+                break
+            if self.esperando_respuesta_usuario:
+                self.logger.info("Agente en espera de la respuesta del usuario.")
+                time.sleep(1)
+                break
             intentos += 1
             self.logger.info(f"--- Ciclo de Ejecución: Intento {intentos}/{max_intentos} ---")
             estado_observado = self.observar()
@@ -275,6 +294,10 @@ Ejemplos de acciones de comunicación:
                 continue
             lock_manager.acquire_lock(self.mi_id_ventana)
             try:
+                if self.parada_emergencia.is_set():
+                    self.logger.warning("Acción no ejecutada debido a parada de emergencia.")
+                    self.resultado_accion_anterior = {'exito': False, 'razon': 'Parada de emergencia activada.'}
+                    break
                 if accion in self.habilidades_fundamentales:
                     if accion in ["pedir_aclaracion", "hablar", "proponer_aprendizaje", "finalizar"]:
                         self._ejecutar_accion_comunicacion(decision)
@@ -300,6 +323,7 @@ Ejemplos de acciones de comunicación:
         if accion in ["pedir_aclaracion", "hablar"]:
             mensaje = params.get('pregunta', params.get('mensaje', 'No sé qué decir.'))
             self.comunicador.hablar(mensaje)
+            self.esperando_respuesta_usuario = True
         elif accion == "proponer_aprendizaje":
             nombre_habilidad = params.get('nombre_habilidad', 'habilidad_desconocida')
             descripcion = params.get('descripcion', 'Sin descripción.')

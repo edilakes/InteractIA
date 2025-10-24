@@ -4,6 +4,7 @@ import logging
 import pytesseract
 import subprocess
 import os
+import time
 
 def buscar_tesseract():
     """
@@ -41,26 +42,32 @@ class Vision:
             self.logger.error(f"Error al configurar Pytesseract. Asegúrate de que Tesseract está instalado. Error: {e}", exc_info=True)
 
     def capturar_entorno(self, id_ventana_propia=None):
-        """Captura la pantalla completa y opcionalmente oculta la ventana propia del agente."""
-        self.logger.debug("Capturando el entorno.")
-        captura_completa = pyautogui.screenshot()
-
+        """Captura la pantalla completa, ocultando temporalmente la ventana propia del agente."""
+        self.logger.debug("Capturando el entorno (ocultando ventana propia).")
+        
+        ventana_propia = None
         if id_ventana_propia:
             try:
                 ventanas = pyautogui.getWindowsWithTitle(id_ventana_propia)
                 if ventanas:
                     ventana_propia = ventanas[0]
-                    draw = ImageDraw.Draw(captura_completa)
-                    # Dibuja un rectángulo negro sobre la ventana propia
-                    draw.rectangle(
-                        (ventana_propia.left, ventana_propia.top, ventana_propia.right, ventana_propia.bottom),
-                        fill='black'
-                    )
-                    self.logger.info(f"Ocultada la ventana propia: '{id_ventana_propia}'")
+                    ventana_propia.hide()
+                    time.sleep(0.1)  # Pausa para asegurar que la ventana se oculte
                 else:
                     self.logger.warning(f"No se encontró la ventana propia para ocultar: '{id_ventana_propia}'")
             except Exception as e:
+                # Si falla al ocultar, no continuamos para no capturar la ventana por error
                 self.logger.error(f"Error al ocultar la ventana propia '{id_ventana_propia}': {e}")
+                # En caso de error, devolvemos una captura normal sin modificar
+                return pyautogui.screenshot()
+
+        captura_completa = pyautogui.screenshot()
+
+        if ventana_propia:
+            try:
+                ventana_propia.show()
+            except Exception as e:
+                self.logger.error(f"Error al volver a mostrar la ventana propia '{id_ventana_propia}': {e}")
 
         return captura_completa
 

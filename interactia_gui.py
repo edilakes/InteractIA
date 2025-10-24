@@ -74,6 +74,8 @@ class InteractIAGUI:
         self.input_entry.bind("<Return>", self.process_command)
         self.send_button = ttk.Button(input_frame, text="Enviar", command=self.process_command)
         self.send_button.grid(row=0, column=2, padx=5)
+        self.stop_button = ttk.Button(input_frame, text="Detener", command=self._on_stop_clicked)
+        self.stop_button.grid(row=0, column=3, padx=5)
 
     def reload_providers_config(self, initial_load=False):
         self.providers_config = load_providers_from_db()
@@ -171,6 +173,11 @@ class InteractIAGUI:
     def show_error_and_exit(self, message):
         messagebox.showerror("Error Crítico", message, parent=self.root)
         self.root.destroy()
+
+    def _on_stop_clicked(self):
+        if self.agente:
+            self.agente.detener_proceso_emergencia()
+            self.insert_log_message("Solicitud de parada de emergencia enviada.")
 
     # ... (Resto de métodos de la GUI sin cambios) ...
     def process_command(self, event=None):
