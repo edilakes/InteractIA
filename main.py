@@ -35,7 +35,9 @@ def main():
         titulo_ventana = f"interactia-{id_instancia}"
 
         root = tk.Tk()
+        root.withdraw() # Hide the main window initially
         app = InteractIAGUI(root, titulo=titulo_ventana, id_objetivo=args.supervisando_a)
+        root.after(0, app.start_gui) # Call start_gui after mainloop starts
         root.mainloop()
         
         # Close the MongoDB connection when the GUI mainloop exits
