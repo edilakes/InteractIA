@@ -5,6 +5,7 @@ import threading
 from agente import Agente
 from model_manager import load_providers_from_db, get_model_provider, get_default_provider_config, _update_last_used_model
 from gui_model_manager import ProviderManagerWindow
+from skill_manager_gui import SkillManagerGUI
 
 class InteractIAGUI:
     def __init__(self, root, titulo="InteractIA - Agente Inteligente", id_objetivo=None):
@@ -24,6 +25,7 @@ class InteractIAGUI:
         self._agent_writing = False
 
         self._create_widgets()
+        self._create_menu_bar()
         self._configure_chat_tags()
         self.reload_providers_config(initial_load=True)
 
@@ -53,29 +55,52 @@ class InteractIAGUI:
         manage_button = ttk.Button(top_frame, text="Gestionar...", command=self._open_provider_manager_window)
         manage_button.grid(row=0, column=4, padx=(10, 0))
 
-        # ... (resto de widgets sin cambios) ...
-        chat_area_frame = ttk.Frame(self.main_frame, padding=(10, 0, 10, 10))
-        chat_area_frame.grid(row=1, column=0, sticky="nsew")
-        chat_area_frame.rowconfigure(0, weight=1)
-        chat_area_frame.columnconfigure(0, weight=1)
-        self.chat_history_text = tk.Text(chat_area_frame, wrap="word", state='disabled', font=('Arial', 10))
-        self.chat_history_text.grid(row=0, column=0, sticky="nsew")
-        self.scrollbar = ttk.Scrollbar(chat_area_frame, orient=tk.VERTICAL, command=self.chat_history_text.yview)
-        self.scrollbar.grid(row=0, column=1, sticky="ns")
-        self.chat_history_text['yscrollcommand'] = self.scrollbar.set
-        self.loading_bar = ttk.Progressbar(chat_area_frame, mode='indeterminate')
-        self.loading_bar.grid(row=1, column=0, columnspan=2, sticky="ew", pady=5)
-        self.loading_bar.grid_remove()
-        input_frame = ttk.Frame(chat_area_frame)
-        input_frame.grid(row=2, column=0, columnspan=2, sticky="ew", pady=10)
-        input_frame.columnconfigure(1, weight=1)
-        self.input_entry = ttk.Entry(input_frame)
-        self.input_entry.grid(row=0, column=1, sticky="ew")
+        # Chat History Text Area
+        self.chat_history_text = tk.Text(self.main_frame, wrap=tk.WORD, state='disabled', font=('Arial', 10))
+        self.chat_history_text.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
+
+        chat_scrollbar = ttk.Scrollbar(self.chat_history_text, orient=tk.VERTICAL, command=self.chat_history_text.yview)
+        chat_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.chat_history_text.config(yscrollcommand=chat_scrollbar.set)
+
+        # Input and Send Frame
+        input_frame = ttk.Frame(self.main_frame, padding="10")
+        input_frame.grid(row=2, column=0, sticky="ew")
+        input_frame.columnconfigure(0, weight=1)
+
+        self.input_entry = ttk.Entry(input_frame, font=('Arial', 10))
+        self.input_entry.grid(row=0, column=0, sticky="ew", padx=(0, 10))
         self.input_entry.bind("<Return>", self.process_command)
+
         self.send_button = ttk.Button(input_frame, text="Enviar", command=self.process_command)
-        self.send_button.grid(row=0, column=2, padx=5)
-        self.stop_button = ttk.Button(input_frame, text="Detener", command=self._on_stop_clicked)
-        self.stop_button.grid(row=0, column=3, padx=5)
+        self.send_button.grid(row=0, column=1, sticky="e")
+
+        # Loading Bar
+        self.loading_bar = ttk.Progressbar(self.main_frame, orient="horizontal", mode="indeterminate")
+        self.loading_bar.grid(row=3, column=0, sticky="ew", padx=10, pady=(0, 10))
+        self.loading_bar.grid_remove() # Hide initially
+
+    def _create_menu_bar(self):
+        menubar = tk.Menu(self.root)
+        self.root.config(menu=menubar)
+
+        # Menu Archivo
+        file_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Archivo", menu=file_menu)
+        file_menu.add_command(label="Salir", command=self.root.quit)
+
+        # Menu Habilidades
+        skills_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Habilidades", menu=skills_menu)
+        skills_menu.add_command(label="Gestionar Habilidades", command=self._open_skill_manager_window)
+
+        # Menu Modelos
+        models_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Modelos", menu=models_menu)
+        models_menu.add_command(label="Gestionar Proveedores/Modelos", command=self._open_provider_manager_window)
+
+    def _open_skill_manager_window(self):
+        SkillManagerWindow(self.root)
 
     def reload_providers_config(self, initial_load=False):
         self.providers_config = load_providers_from_db()
