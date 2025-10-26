@@ -1,343 +1,289 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
-import json
 import threading
+import os
+from model_manager import refresh_provider_models, load_providers_from_db, update_last_used_model, PROVIDER_MAP
+from provider_db_manager import provider_db_manager
 
-from model_manager import refresh_provider_models, load_providers_from_db, get_model_provider, _update_last_used_model
-from provider_db_manager import provider_db_manager # Import the manager for direct DB operations
+def _add_env_variable_to_file(variable_name):
+    """
+    Añade una variable al archivo .env si no existe.
+    Crea el archivo si no existe.
+    """
+    env_path = ".env"
+    line_to_add = f'\n{variable_name}=""'
+    try:
+        if os.path.exists(env_path):
+            with open(env_path, 'r') as f:
+                if any(line.strip().startswith(f'{variable_name}=') for line in f):
+                    return  # Ya existe
+        
+        with open(env_path, 'a') as f:
+            f.write(line_to_add)
+            
+    except IOError as e:
+        messagebox.showwarning("Error de Archivo",
+                               f"No se pudo escribir en el archivo .env: {e}\n"
+                               "Por favor, añade la variable manualmente.")
 
-class ProviderEditDialog(tk.Toplevel):
-    """Diálogo para añadir o editar una configuración de proveedor."""
-    def __init__(self, parent, provider_data=None):
+class ApiKeyEditDialog(tk.Toplevel):
+    """Diálogo para añadir o editar una configuración de API key."""
+    def __init__(self, parent, provider_type, key_data=None):
         super().__init__(parent)
         self.transient(parent)
-        self.title("Añadir/Editar Proveedor")
+        self.title(f"Clave de API para {provider_type}")
         self.result = None
-        self.provider_data = provider_data or {}
+        self.key_data = key_data or {}
 
         frame = ttk.Frame(self, padding="10")
         frame.grid(row=0, column=0, sticky="nsew")
 
-        ttk.Label(frame, text="Nombre de Configuración:").grid(row=0, column=0, sticky="w", pady=2)
+        ttk.Label(frame, text="Nombre de la Variable de Entorno:").grid(row=0, column=0, sticky="w", pady=2)
         self.name_entry = ttk.Entry(frame, width=40)
         self.name_entry.grid(row=0, column=1, sticky="ew")
-        self.name_entry.insert(0, self.provider_data.get("name", ""))
-
-        ttk.Label(frame, text="Tipo de Proveedor:").grid(row=1, column=0, sticky="w", pady=2)
-        self.type_combo = ttk.Combobox(frame, values=["gemini"], state="readonly")
-        self.type_combo.grid(row=1, column=1, sticky="ew")
-        self.type_combo.set(self.provider_data.get("provider_type", "gemini"))
-
-        ttk.Label(frame, text="Variable de Entorno (API Key):").grid(row=2, column=0, sticky="w", pady=2)
-        self.api_key_env_entry = ttk.Entry(frame)
-        self.api_key_env_entry.grid(row=2, column=1, sticky="ew")
-        self.api_key_env_entry.insert(0, self.provider_data.get("config", {}).get("api_key_env", ""))
+        self.name_entry.insert(0, self.key_data.get("name", ""))
 
         button_frame = ttk.Frame(frame)
-        button_frame.grid(row=3, column=0, columnspan=2, pady=(10, 0))
+        button_frame.grid(row=1, column=0, columnspan=2, pady=(10, 0))
         ttk.Button(button_frame, text="Guardar", command=self.on_save).pack(side="left", padx=5)
         ttk.Button(button_frame, text="Cancelar", command=self.destroy).pack(side="left", padx=5)
 
         self.grab_set()
-        self.protocol("WM_DELETE_WINDOW", self.destroy)
         self.wait_window(self)
 
     def on_save(self):
         name = self.name_entry.get().strip()
-        provider_type = self.type_combo.get()
-        api_key_env = self.api_key_env_entry.get().strip()
+        api_key_env_name = name
 
-        if not all([name, provider_type, api_key_env]):
-            messagebox.showerror("Error de Validación", "Todos los campos son obligatorios.", parent=self)
+        if not name:
+            messagebox.showerror("Error", "El campo es obligatorio.", parent=self)
             return
 
-        self.result = {
-            "id": self.provider_data.get("id", f"{provider_type}-{name.lower().replace(' ', '-')}"),
-            "name": name,
-            "provider_type": provider_type,
-            "config": {"api_key_env": api_key_env}
-        }
+        _add_env_variable_to_file(api_key_env_name)
+
+        self.result = self.key_data.copy()
+        self.result.update({"name": name, "api_key_env_name": api_key_env_name})
+        if "available_models" not in self.result:
+            self.result["available_models"] = []
         self.destroy()
 
 class ProviderManagerWindow(tk.Toplevel):
-    """Ventana para gestionar las configuraciones de proveedores de IA.""" 
-    def __init__(self, parent, providers_config: list):
+    """Ventana para gestionar proveedores, claves de API y modelos."""
+    def __init__(self, parent):
+        print("Initializing ProviderManagerWindow...")
         super().__init__(parent)
-        print("DEBUG: ProviderManagerWindow.__init__ started")
         self.transient(parent)
-        self.title("Gestionar Proveedores de IA")
-        self.geometry("600x500") # Adjusted geometry for two listboxes
+        self.title("Gestionar Modelos de IA")
+        self.geometry("700x400")
         self.parent = parent
-        self.providers_config = list(providers_config)
+        self.providers_data = []
 
-        self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(0, weight=1) # Row for providers list
-        self.grid_rowconfigure(1, weight=1) # Row for models list
-        self.grid_rowconfigure(2, weight=0) # Row for buttons
+        self.protocol("WM_DELETE_WINDOW", self.on_close)
 
-        # --- Providers Frame ---
-        providers_frame = ttk.LabelFrame(self, text="Proveedores", padding="10")
-        providers_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=5)
-        providers_frame.grid_rowconfigure(0, weight=1)
-        providers_frame.grid_columnconfigure(0, weight=1)
+        # Layout
+        main_frame = ttk.Frame(self, padding="10")
+        main_frame.pack(fill="both", expand=True)
+        main_frame.columnconfigure(1, weight=1)
 
-        self.providers_listbox = tk.Listbox(providers_frame)
-        self.providers_listbox.grid(row=0, column=0, sticky="nsew")
-        self.providers_listbox.bind("<<ListboxSelect>>", self._on_list_select)
+        # Comboboxes
+        ttk.Label(main_frame, text="Proveedor:").grid(row=0, column=0, sticky="w")
+        self.provider_combo = ttk.Combobox(main_frame, state="readonly")
+        self.provider_combo.grid(row=0, column=1, sticky="ew", pady=2)
+        self.provider_combo.bind("<<ComboboxSelected>>", self.on_provider_selected)
 
-        providers_scrollbar = ttk.Scrollbar(providers_frame, orient="vertical", command=self.providers_listbox.yview)
-        providers_scrollbar.grid(row=0, column=1, sticky="ns")
-        self.providers_listbox.config(yscrollcommand=providers_scrollbar.set)
+        ttk.Label(main_frame, text="Clave API:").grid(row=1, column=0, sticky="w")
+        self.api_key_combo = ttk.Combobox(main_frame, state="readonly")
+        self.api_key_combo.grid(row=1, column=1, sticky="ew", pady=2)
+        self.api_key_combo.bind("<<ComboboxSelected>>", self.on_api_key_selected)
 
-        # --- Models Frame ---
-        models_frame = ttk.LabelFrame(self, text="Modelos del Proveedor Seleccionado", padding="10")
-        models_frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=5)
-        models_frame.grid_rowconfigure(0, weight=1)
-        models_frame.grid_columnconfigure(0, weight=1)
-
+        # Models Listbox
+        models_frame = ttk.LabelFrame(main_frame, text="Modelos Disponibles", padding="5")
+        models_frame.grid(row=2, column=0, columnspan=3, sticky="nsew", pady=5)
+        models_frame.rowconfigure(0, weight=1)
+        models_frame.columnconfigure(0, weight=1)
         self.models_listbox = tk.Listbox(models_frame)
         self.models_listbox.grid(row=0, column=0, sticky="nsew")
-        self.models_listbox.bind("<<ListboxSelect>>", self._on_model_list_select) # New binding for model selection
+        self.models_listbox.bind("<<ListboxSelect>>", self.on_model_selected)
 
-        models_scrollbar = ttk.Scrollbar(models_frame, orient="vertical", command=self.models_listbox.yview)
-        models_scrollbar.grid(row=0, column=1, sticky="ns")
-        self.models_listbox.config(yscrollcommand=models_scrollbar.set)
+        # Buttons
+        self.api_key_buttons = ttk.Frame(main_frame)
+        self.api_key_buttons.grid(row=1, column=2, padx=5)
+        self.add_key_btn = ttk.Button(self.api_key_buttons, text="Añadir", command=self.add_api_key)
+        self.add_key_btn.pack(side="left")
+        self.edit_key_btn = ttk.Button(self.api_key_buttons, text="Editar", command=self.edit_api_key)
+        self.edit_key_btn.pack(side="left")
+        self.del_key_btn = ttk.Button(self.api_key_buttons, text="Eliminar", command=self.delete_api_key)
+        self.del_key_btn.pack(side="left")
 
-        # --- Button Frame ---
-        self.button_frame = ttk.Frame(self) # Make button_frame an instance variable
-        self.button_frame.grid(row=2, column=0, pady=10)
+        self.refresh_btn = ttk.Button(main_frame, text="Refrescar Modelos", command=self.refresh_models)
+        self.refresh_btn.grid(row=3, column=1, sticky="e", pady=5)
 
-        self.add_button = ttk.Button(self.button_frame, text="Añadir...", command=self.add_provider)
-        self.add_button.pack(side="left", padx=5)
-        self.edit_button = ttk.Button(self.button_frame, text="Editar...", command=self.edit_provider, state="disabled")
-        self.edit_button.pack(side="left", padx=5)
-        self.delete_button = ttk.Button(self.button_frame, text="Eliminar", command=self.delete_provider, state="disabled")
-        self.delete_button.pack(side="left", padx=5)
+        # New button for selecting model and restarting app
+        selection_frame = ttk.Frame(main_frame)
+        selection_frame.grid(row=4, column=0, columnspan=3, pady=(10, 0), sticky="ew")
+        selection_frame.columnconfigure(0, weight=1) # Center the button
 
-        self.refresh_models_button = ttk.Button(self.button_frame, text="Refrescar Modelos", command=self.refresh_models_for_selected_provider, state="disabled")
-        self.refresh_models_button.pack(side="left", padx=5)
-        print("DEBUG: self.refresh_models_button initialized.")
+        self.select_and_restart_btn = ttk.Button(selection_frame, text="Seleccionar y Reiniciar", command=self.select_and_restart, state="disabled")
+        self.select_and_restart_btn.pack() # Use pack to center within its frame if it only has one button
 
-        ttk.Button(self.button_frame, text="Cerrar", command=self.on_close).pack(side="right", padx=5)
 
-        self.refresh_listbox()
+        self.load_data_and_populate()
+        self.grab_set()
+        self.wait_window(self)
+        print("ProviderManagerWindow initialized and waiting.")
 
-    def refresh_listbox(self):
-        self.providers_config = load_providers_from_db() # Reload providers config from DB
-        self.providers_listbox.delete(0, tk.END)
-        
-        if not self.providers_config:
-            self.models_listbox.delete(0, tk.END)
-            self.edit_button.config(state="disabled")
-            self.delete_button.config(state="disabled")
-            self.refresh_models_button.config(state="disabled")
-            messagebox.showinfo("Configuración", "No se encontraron proveedores. Por favor, añada uno.", parent=self)
-            return
+    def load_data_and_populate(self):
+        self.providers_data = load_providers_from_db()
+        provider_types = list(PROVIDER_MAP.keys())
+        self.provider_combo["values"] = provider_types
 
-        # Try to find the last used provider and model
-        found_last_used = False
-        selected_provider_idx = 0
-        selected_model_name = None
-
-        for i, provider_config in enumerate(self.providers_config):
-            self.providers_listbox.insert(tk.END, provider_config['name'])
-            if "available_models" in provider_config and provider_config["available_models"]:
-                for model in provider_config["available_models"]:
-                    if model.get("is_last_used"):
-                        selected_provider_idx = i
-                        selected_model_name = model["name"]
-                        found_last_used = True
-                        break
-            if found_last_used:
+        # Find and select the last used provider, key, and model
+        last_used_provider = None
+        last_used_key = None
+        for provider in self.providers_data:
+            for key_config in provider.get("api_key_configs", []):
+                if any(m.get("is_last_used") for m in key_config.get("available_models", [])):
+                    last_used_provider = provider["provider_type"]
+                    last_used_key = key_config["name"]
+                    break
+            if last_used_provider:
                 break
         
-        # If no last used model found, or provider has no models, use fallback logic
-        if not found_last_used or not self.providers_config[selected_provider_idx].get("available_models"):
-            # Select the first provider
-            selected_provider_idx = 0
-            current_provider_config = self.providers_config[selected_provider_idx]
-            provider_id = current_provider_config.get("id")
+        if last_used_provider:
+            self.provider_combo.set(last_used_provider)
+            self.on_provider_selected(None, select_key=last_used_key)
+        elif provider_types:
+            self.provider_combo.set(provider_types[0])
+            self.on_provider_selected(None)
 
-            if provider_id:
-                messagebox.showinfo("Configuración Inicial", f"Configurando proveedor '{current_provider_config['name']}'. Refrescando modelos...", parent=self)
-                try:
-                    # Refresh models in a separate thread to avoid freezing the UI
-                    threading.Thread(target=self._perform_initial_refresh_and_select, args=(provider_id, selected_provider_idx)).start()
-                    return # Exit to let the thread handle UI updates
-                except Exception as e:
-                    messagebox.showerror("Error", f"Error al refrescar modelos iniciales: {e}", parent=self)
-            else:
-                messagebox.showwarning("Advertencia", "El primer proveedor no tiene un ID válido.", parent=self)
-                # Fallback to disabling buttons if even first provider is invalid
-                self.models_listbox.delete(0, tk.END)
-                self.edit_button.config(state="disabled")
-                self.delete_button.config(state="disabled")
-                self.refresh_models_button.config(state="disabled")
-                return
+    def on_provider_selected(self, event, select_key=None):
+        provider_type = self.provider_combo.get()
+        provider = next((p for p in self.providers_data if p["provider_type"] == provider_type), None)
+        
+        key_names = []
+        if provider:
+            key_names = [k["name"] for k in provider.get("api_key_configs", [])]
 
-        # If a last used model was found, or after fallback refresh, update UI
-        self.providers_listbox.selection_set(selected_provider_idx)
-        self._update_models_display(selected_provider_idx, selected_model_name)
-        self._set_button_states(True)
-
-    def _perform_initial_refresh_and_select(self, provider_id, selected_provider_idx):
-        print("DEBUG: _perform_initial_refresh_and_select started.")
-        try:
-            refresh_provider_models(provider_id)
-            self.providers_config = load_providers_from_db() # Reload providers_config after refresh
-            current_provider_config = self.providers_config[selected_provider_idx]
-
-            # Select the first model in the newly refreshed list as last used
-            if "available_models" in current_provider_config and current_provider_config["available_models"]:
-                first_model_name = current_provider_config["available_models"][0]["name"]
-                _update_last_used_model(provider_id, first_model_name)
-                selected_model_name = first_model_name
-            else:
-                selected_model_name = None
-            
-            # Update UI on the main thread
-            self.parent.after(0, lambda: self._update_ui_after_initial_refresh(selected_provider_idx, selected_model_name))
-        except Exception as e:
-            self.parent.after(0, lambda: messagebox.showerror("Error", f"Error en el refresco inicial en segundo plano: {e}", parent=self))
-
-    def _update_ui_after_initial_refresh(self, selected_provider_idx, selected_model_name):
-        print("DEBUG: _update_ui_after_initial_refresh started.")
-        self.providers_listbox.selection_set(selected_provider_idx)
-        self._update_models_display(selected_provider_idx, selected_model_name)
-        self._set_button_states(True)
-        if hasattr(self.parent, "reload_providers_config"):
-            self.parent.reload_providers_config()
-        messagebox.showinfo("Configuración Inicial", "Modelos refrescados y configurados correctamente.", parent=self)
-
-    def _update_models_display(self, provider_idx, model_to_select_name=None):
-        print("DEBUG: _update_models_display started.")
+        self.api_key_combo["values"] = key_names
         self.models_listbox.delete(0, tk.END)
-        selected_provider = self.providers_config[provider_idx]
-        if "available_models" in selected_provider and selected_provider["available_models"]:
-            for i, model in enumerate(selected_provider["available_models"]):
-                self.models_listbox.insert(tk.END, model["name"])
-                if model.get("name") == model_to_select_name:
-                    self.models_listbox.selection_set(i)
-                    self.models_listbox.see(i)
 
-    def _set_button_states(self, enable: bool):
-        print(f"DEBUG: _set_button_states called with enable={enable}")
-        state = "normal" if enable else "disabled"
-        self.edit_button.config(state=state)
-        self.delete_button.config(state=state)
-        self.refresh_models_button.config(state=state)
-
-    def _on_list_select(self, event):
-        print("DEBUG: _on_list_select started.")
-        cur_selection = self.providers_listbox.curselection()
-        if cur_selection:
-            idx = cur_selection[0]
-            self._update_models_display(idx)
-            self._set_button_states(True)
+        if select_key and select_key in key_names:
+            self.api_key_combo.set(select_key)
+            self.on_api_key_selected(None)
+        elif key_names:
+            self.api_key_combo.set(key_names[0])
+            self.on_api_key_selected(None)
         else:
-            self.models_listbox.delete(0, tk.END)
-            self._set_button_states(False)
+            self.api_key_combo.set("")
 
-    def _on_model_list_select(self, event):
-        print("DEBUG: _on_model_list_select started.")
-        # This method is called when a model is selected in the models_listbox
-        # We need to update the is_last_used flag in providers.json
-        cur_provider_selection = self.providers_listbox.curselection()
-        cur_model_selection = self.models_listbox.curselection()
-
-        if cur_provider_selection and cur_model_selection:
-            provider_idx = cur_provider_selection[0]
-            model_idx = cur_model_selection[0]
-            selected_provider = self.providers_config[provider_idx]
-            selected_model_name = selected_provider["available_models"][model_idx]["name"]
-            _update_last_used_model(selected_provider["id"], selected_model_name)
-            # Also notify main GUI to reload if necessary
-            if hasattr(self.parent, "reload_providers_config"):
-                self.parent.reload_providers_config()
-
-    def add_provider(self):
-        print("DEBUG: add_provider started.")
-        dialog = ProviderEditDialog(self)
-        if dialog.result:
-            # Ensure new provider has an empty available_models list
-            if "available_models" not in dialog.result:
-                dialog.result["available_models"] = []
-            # Insert into DB
-            provider_db_manager.insert_provider(dialog.result)
-            self.refresh_listbox()
-
-    def edit_provider(self):
-        print("DEBUG: edit_provider started.")
-        idx = self.providers_listbox.curselection()[0]
-        original_provider_id = self.providers_config[idx]["id"]
-        dialog = ProviderEditDialog(self, provider_data=self.providers_config[idx])
-        if dialog.result:
-            # Preserve available_models if not explicitly set in dialog.result
-            if "available_models" not in dialog.result and "available_models" in self.providers_config[idx]:
-                dialog.result["available_models"] = self.providers_config[idx]["available_models"]
-            elif "available_models" not in dialog.result:
-                dialog.result["available_models"] = []
-            # Update in DB
-            provider_db_manager.update_provider(original_provider_id, dialog.result)
-            self.refresh_listbox()
-
-    def delete_provider(self):
-        print("DEBUG: delete_provider started.")
-        idx = self.providers_listbox.curselection()[0]
-        provider_to_delete = self.providers_config[idx]
-        if messagebox.askyesno("Confirmar", f"¿Seguro que quieres eliminar '{provider_to_delete['name']}'?", parent=self):
-            # Delete from DB
-            provider_db_manager.delete_provider(provider_to_delete["id"])
-            self.refresh_listbox()
-
-    def on_close(self):
-        print("DEBUG: on_close started.")
-        try:
-            # No need to write providers.json here, as DB manager handles it
-            if hasattr(self.parent, "reload_providers_config"):
-                self.parent.reload_providers_config()
-        except Exception as e:
-            messagebox.showerror("Error", f"Error al cerrar la ventana: {e}", parent=self)
-        self.destroy()
-
-    def refresh_models_for_selected_provider(self):
-        print("DEBUG: refresh_models_for_selected_provider started.")
-        cur_selection = self.providers_listbox.curselection()
-        if not cur_selection:
+    def on_api_key_selected(self, event):
+        provider_type = self.provider_combo.get()
+        key_name = self.api_key_combo.get()
+        provider = next((p for p in self.providers_data if p["provider_type"] == provider_type), None)
+        if not provider or not key_name:
             return
 
-        idx = cur_selection[0]
-        selected_provider = self.providers_config[idx]
-        provider_id = selected_provider.get("id")
+        key_config = next((k for k in provider.get("api_key_configs", []) if k["name"] == key_name), None)
+        self.models_listbox.delete(0, tk.END)
+        if not key_config or not key_config.get("available_models"):
+            return
 
-        if provider_id:
-            try:
-                messagebox.showinfo("Refrescando Modelos", f"Refrescando modelos para {selected_provider['name']}...", parent=self)
-                # Perform refresh in a separate thread
-                threading.Thread(target=self._perform_refresh_and_update_ui, args=(provider_id, idx)).start()
-            except Exception as e:
-                messagebox.showerror("Error al Refrescar Modelos", f"Ocurrió un error: {e}", parent=self)
-        else:
-            messagebox.showwarning("Advertencia", "El proveedor seleccionado no tiene un ID.", parent=self)
+        last_used_model_idx = -1
+        for i, model in enumerate(key_config["available_models"]):
+            self.models_listbox.insert(tk.END, model["name"])
+            if model.get("is_last_used"):
+                last_used_model_idx = i
+        
+        if last_used_model_idx != -1:
+            self.models_listbox.selection_set(last_used_model_idx)
 
-    def _perform_refresh_and_update_ui(self, provider_id, provider_idx):
-        print("DEBUG: _perform_refresh_and_update_ui started.")
+    def on_model_selected(self, event):
+        if not self.models_listbox.curselection():
+            self.select_and_restart_btn.config(state="disabled")
+            return
+        provider_type = self.provider_combo.get()
+        key_name = self.api_key_combo.get()
+        model_name = self.models_listbox.get(self.models_listbox.curselection()[0])
+        update_last_used_model(provider_type, key_name, model_name) # Keep this as it updates last used on selection
+        self.select_and_restart_btn.config(state="normal") # Enable the button
+
+    def add_api_key(self):
+        provider_type = self.provider_combo.get()
+        if not provider_type:
+            messagebox.showwarning("Atención", "Selecciona un proveedor primero.", parent=self)
+            return
+        
+        dialog = ApiKeyEditDialog(self, provider_type)
+        if dialog.result:
+            provider_db_manager.add_api_key_config(provider_type, dialog.result)
+            self.load_data_and_populate()
+
+    def edit_api_key(self):
+        provider_type = self.provider_combo.get()
+        key_name = self.api_key_combo.get()
+        if not provider_type or not key_name:
+            return
+
+        provider = next((p for p in self.providers_data if p["provider_type"] == provider_type), None)
+        key_config = next((k for k in provider["api_key_configs"] if k["name"] == key_name), None)
+
+        dialog = ApiKeyEditDialog(self, provider_type, key_data=key_config)
+        if dialog.result:
+            provider_db_manager.update_api_key_config(provider_type, key_name, dialog.result)
+            self.load_data_and_populate()
+
+    def delete_api_key(self):
+        provider_type = self.provider_combo.get()
+        key_name = self.api_key_combo.get()
+        if not provider_type or not key_name:
+            return
+
+        if messagebox.askyesno("Confirmar", f"¿Eliminar la clave '{key_name}'?", parent=self):
+            provider_db_manager.delete_api_key_config(provider_type, key_name)
+            self.load_data_and_populate()
+
+    def refresh_models(self):
+        provider_type = self.provider_combo.get()
+        key_name = self.api_key_combo.get()
+        if not provider_type or not key_name:
+            messagebox.showwarning("Atención", "Selecciona un proveedor y una clave API.", parent=self)
+            return
+
+        messagebox.showinfo("Refrescando", f"Refrescando modelos para {key_name}...", parent=self)
+        threading.Thread(target=self._refresh_thread, args=(provider_type, key_name)).start()
+
+    def _refresh_thread(self, provider_type, key_name):
         try:
-            refresh_provider_models(provider_id)
-            self.providers_config = load_providers_from_db() # Reload config after refresh
-            self.parent.after(0, lambda: self._update_ui_after_refresh(provider_idx))
+            refresh_provider_models(provider_type, key_name)
+            self.after(0, self.load_data_and_populate)
+            self.after(0, lambda: messagebox.showinfo("Éxito", "Modelos actualizados.", parent=self))
         except Exception as e:
-            self.parent.after(0, lambda: messagebox.showerror("Error", f"Error al refrescar modelos en segundo plano: {e}", parent=self))
+            self.after(0, lambda: messagebox.showerror("Error", f"No se pudieron refrescar los modelos: {e}", parent=self))
 
-    def _update_ui_after_refresh(self, provider_idx):
-        print("DEBUG: _update_ui_after_refresh started.")
-        # Re-select the provider in the listbox to trigger models list update
-        self.providers_listbox.selection_clear(0, tk.END)
-        self.providers_listbox.selection_set(provider_idx)
-        self._on_list_select(None) # This will update the models listbox and button states
+    def select_and_restart(self):
+        provider_type = self.provider_combo.get()
+        key_name = self.api_key_combo.get()
+        if not self.models_listbox.curselection():
+            messagebox.showwarning("Selección Incompleta", "Por favor, selecciona un modelo de la lista.", parent=self)
+            return
+        model_name = self.models_listbox.get(self.models_listbox.curselection()[0])
 
-        # Notify the main GUI to reload its configuration
+        messagebox.showinfo("Reiniciando Aplicación", 
+                            "La aplicación se cerrará y se reiniciará con el modelo seleccionado.", 
+                            parent=self)
+        if messagebox.askyesno("Confirmar Selección", 
+                               f"Se establecerá '{model_name}' como el modelo predeterminado y la aplicación se cerrará para aplicar los cambios.\n\n¿Deseas continuar?", 
+                               parent=self):
+            update_last_used_model(provider_type, key_name, model_name)
+            # Call a method in the parent (main GUI) to handle the exit
+            if hasattr(self.parent, "exit_application"):
+                self.parent.exit_application()
+            else:
+                self.parent.destroy() # Fallback if for some reason the parent doesn't have it
+
+    def on_close(self):
+        print("ProviderManagerWindow closing.")
         if hasattr(self.parent, "reload_providers_config"):
             self.parent.reload_providers_config()
-
-        messagebox.showinfo("Refrescando Modelos", "Modelos actualizados correctamente.", parent=self)
+        print("Destroying ProviderManagerWindow...")
+        self.destroy()
