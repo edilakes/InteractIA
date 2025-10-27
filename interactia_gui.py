@@ -19,7 +19,6 @@ class InteractIAGUI:
         self.providers_config = []
         self.selected_provider_config = None
         self.active_provider = None
-        # self.available_models = [] # No longer needed as models are in provider_config
         self.selected_model = None
         self.agente = None
         self._agent_writing = False
@@ -55,7 +54,6 @@ class InteractIAGUI:
         manage_button = ttk.Button(top_frame, text="Gestionar...", command=self._open_provider_manager_window)
         manage_button.grid(row=0, column=4, padx=(10, 0))
 
-        # Chat History Text Area
         self.chat_history_text = tk.Text(self.main_frame, wrap=tk.WORD, state='disabled', font=('Arial', 10))
         self.chat_history_text.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
 
@@ -63,38 +61,48 @@ class InteractIAGUI:
         chat_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.chat_history_text.config(yscrollcommand=chat_scrollbar.set)
 
-        # Input and Send Frame
         input_frame = ttk.Frame(self.main_frame, padding="10")
         input_frame.grid(row=2, column=0, sticky="ew")
         input_frame.columnconfigure(0, weight=1)
 
-        self.input_entry = ttk.Entry(input_frame, font=('Arial', 10))
-        self.input_entry.grid(row=0, column=0, sticky="ew", padx=(0, 10))
-        self.input_entry.bind("<Return>", self.process_command)
+        self.input_text = tk.Text(input_frame, height=1, font=('Arial', 10), wrap="word")
+        self.input_text.grid(row=0, column=0, sticky="ew", padx=(0, 10))
+        self.input_text.bind("<Control-Return>", self.process_command)
+        self.input_text.bind("<KeyRelease>", self._on_input_text_change)
 
+        self.input_scrollbar = ttk.Scrollbar(input_frame, orient=tk.VERTICAL, command=self.input_text.yview)
+        self.input_text.config(yscrollcommand=self.input_scrollbar.set)
+        
         self.send_button = ttk.Button(input_frame, text="Enviar", command=self.process_command)
-        self.send_button.grid(row=0, column=1, sticky="e")
+        self.send_button.grid(row=0, column=2, sticky="e")
 
-        # Loading Bar
         self.loading_bar = ttk.Progressbar(self.main_frame, orient="horizontal", mode="indeterminate")
         self.loading_bar.grid(row=3, column=0, sticky="ew", padx=10, pady=(0, 10))
-        self.loading_bar.grid_remove() # Hide initially
+        self.loading_bar.grid_remove()
+
+    def _on_input_text_change(self, event=None):
+        # Calculate the number of visible lines (including wrapped lines)
+        num_lines = self.input_text.count("1.0", "end", "displaylines")[0]
+        
+        if num_lines <= 10:
+            self.input_text.config(height=num_lines)
+            self.input_scrollbar.grid_remove()
+        else:
+            self.input_text.config(height=10)
+            self.input_scrollbar.grid(row=0, column=1, sticky="ns")
 
     def _create_menu_bar(self):
         menubar = tk.Menu(self.root)
         self.root.config(menu=menubar)
 
-        # Menu Archivo
         file_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Archivo", menu=file_menu)
         file_menu.add_command(label="Salir", command=self.root.quit)
 
-        # Menu Habilidades
         skills_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Habilidades", menu=skills_menu)
         skills_menu.add_command(label="Gestionar Habilidades", command=self._open_skill_manager_window)
 
-        # Menu Modelos
         models_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Modelos", menu=models_menu)
         models_menu.add_command(label="Gestionar Proveedores/Modelos", command=self._open_provider_manager_window)
@@ -111,17 +119,13 @@ class InteractIAGUI:
         provider_names = [p['name'] for p in self.providers_config]
         self.provider_selector['values'] = provider_names
 
-        # Get the default/last used provider and model
         default_provider_config, default_model_name = get_default_provider_config()
         
-        # Set the provider selector
         self.provider_selector.set(default_provider_config['name'])
         self.selected_provider_config = default_provider_config
 
-        # Populate and set the model selector
         self._update_models_dropdown(default_model_name)
         
-        # Initialize agent with the default/last used model
         self._initialize_agent()
 
     def _on_provider_selected(self, event):
@@ -129,8 +133,6 @@ class InteractIAGUI:
         self.selected_provider_config = next(p for p in self.providers_config if p['name'] == selected_name)
         self.insert_log_message(f"Proveedor seleccionado: {selected_name}. Cargando modelos...")
         
-        # Populate and set the model selector based on the selected provider's available_models
-        # Try to find the last used model for this provider, otherwise select the first
         last_used_model_name = None
         if "available_models" in self.selected_provider_config:
             for model in self.selected_provider_config["available_models"]:
@@ -139,9 +141,7 @@ class InteractIAGUI:
                     break
         
         self._update_models_dropdown(last_used_model_name)
-        self._initialize_agent() # Re-initialize agent with the new provider/model
-
-    # Removed _load_models_for_provider as models are loaded statically
+        self._initialize_agent()
 
     def _update_models_dropdown(self, model_to_select: str = None):
         available_models_names = [model["name"] for model in self.selected_provider_config.get("available_models", [])]
@@ -153,10 +153,9 @@ class InteractIAGUI:
             if model_to_select and model_to_select in available_models_names:
                 self.model_selector.set(model_to_select)
             else:
-                self.model_selector.set(available_models_names[0]) # Default to first model
+                self.model_selector.set(available_models_names[0])
             
-            self.selected_model = self.model_selector.get() # Update selected_model
-            # No need to call _on_model_selected here, as it will be called after agent init
+            self.selected_model = self.model_selector.get()
         else:
             self.model_selector.set("No se encontraron modelos")
             self.model_selector.config(state="disabled")
@@ -165,7 +164,6 @@ class InteractIAGUI:
     def _on_model_selected(self, event):
         self.selected_model = self.model_selector.get()
         if self.selected_model and self.selected_model != "Cargando...":
-            # Persist the selected model as last used
             _update_last_used_model(self.selected_provider_config["id"], self.selected_model)
             self._initialize_agent()
 
@@ -173,8 +171,6 @@ class InteractIAGUI:
         if not self.selected_provider_config or not self.selected_model:
             return
         try:
-            # get_model_provider now returns an initialized provider instance
-            # We need to ensure the correct model is set on it.
             self.active_provider = get_model_provider(self.selected_provider_config)
             self.active_provider.set_model(self.selected_model)
 
@@ -192,7 +188,6 @@ class InteractIAGUI:
             self.show_error_and_exit(f"Error al inicializar agente: {e}")
 
     def _open_provider_manager_window(self):
-        # El nombre de la config en gui_model_manager.py es `models_config`, hay que pasarlo así
         ProviderManagerWindow(self.root, providers_config=self.providers_config)
 
     def show_error_and_exit(self, message):
@@ -204,13 +199,13 @@ class InteractIAGUI:
             self.agente.detener_proceso_emergencia()
             self.insert_log_message("Solicitud de parada de emergencia enviada.")
 
-    # ... (Resto de métodos de la GUI sin cambios) ...
     def process_command(self, event=None):
-        command = self.input_entry.get()
+        command = self.input_text.get("1.0", tk.END).strip()
         if not command or not self.agente or not self.agente.operativo:
             return
         self.insert_message(command, 'user')
-        self.input_entry.delete(0, tk.END)
+        self.input_text.delete("1.0", tk.END)
+        self._on_input_text_change()
         self.loading_bar.grid()
         self.loading_bar.start(10)
         self.agente.establecer_objetivo(command)
