@@ -108,7 +108,7 @@ class InteractIAGUI:
         models_menu.add_command(label="Gestionar Proveedores/Modelos", command=self._open_provider_manager_window)
 
     def _open_skill_manager_window(self):
-        SkillManagerWindow(self.root)
+        SkillManagerGUI(self.root)
 
     def reload_providers_config(self, initial_load=False):
         self.providers_config = load_providers_from_db()
