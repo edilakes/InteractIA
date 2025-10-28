@@ -5,7 +5,6 @@ import threading
 from agente import Agente
 from model_manager import load_providers_from_db, get_model_provider, get_default_provider_config, _update_last_used_model
 from gui_model_manager import ProviderManagerWindow
-from skill_manager_gui import SkillManagerGUI
 
 class InteractIAGUI:
     def __init__(self, root, titulo="InteractIA - Agente Inteligente", id_objetivo=None):
@@ -24,7 +23,6 @@ class InteractIAGUI:
         self._agent_writing = False
 
         self._create_widgets()
-        self._create_menu_bar()
         self._configure_chat_tags()
         self.reload_providers_config(initial_load=True)
 
@@ -54,61 +52,54 @@ class InteractIAGUI:
         manage_button = ttk.Button(top_frame, text="Gestionar...", command=self._open_provider_manager_window)
         manage_button.grid(row=0, column=4, padx=(10, 0))
 
-        self.chat_history_text = tk.Text(self.main_frame, wrap=tk.WORD, state='disabled', font=('Arial', 10))
-        self.chat_history_text.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
-
-        chat_scrollbar = ttk.Scrollbar(self.chat_history_text, orient=tk.VERTICAL, command=self.chat_history_text.yview)
-        chat_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        self.chat_history_text.config(yscrollcommand=chat_scrollbar.set)
-
-        input_frame = ttk.Frame(self.main_frame, padding="10")
-        input_frame.grid(row=2, column=0, sticky="ew")
-        input_frame.columnconfigure(0, weight=1)
-
-        self.input_text = tk.Text(input_frame, height=1, font=('Arial', 10), wrap="word")
-        self.input_text.grid(row=0, column=0, sticky="ew", padx=(0, 10))
-        self.input_text.bind("<Control-Return>", self.process_command)
-        self.input_text.bind("<KeyRelease>", self._on_input_text_change)
-
-        self.input_scrollbar = ttk.Scrollbar(input_frame, orient=tk.VERTICAL, command=self.input_text.yview)
-        self.input_text.config(yscrollcommand=self.input_scrollbar.set)
+        chat_area_frame = ttk.Frame(self.main_frame, padding=(10, 0, 10, 10))
+        chat_area_frame.grid(row=1, column=0, sticky="nsew")
+        chat_area_frame.rowconfigure(0, weight=1)
+        chat_area_frame.columnconfigure(0, weight=1)
         
-        self.send_button = ttk.Button(input_frame, text="Enviar", command=self.process_command)
-        self.send_button.grid(row=0, column=2, sticky="e")
-
-        self.loading_bar = ttk.Progressbar(self.main_frame, orient="horizontal", mode="indeterminate")
-        self.loading_bar.grid(row=3, column=0, sticky="ew", padx=10, pady=(0, 10))
+        self.chat_history_text = tk.Text(chat_area_frame, wrap="word", state='disabled', font=('Arial', 10))
+        self.chat_history_text.grid(row=0, column=0, sticky="nsew")
+        
+        self.scrollbar = ttk.Scrollbar(chat_area_frame, orient=tk.VERTICAL, command=self.chat_history_text.yview)
+        self.scrollbar.grid(row=0, column=1, sticky="ns")
+        self.chat_history_text['yscrollcommand'] = self.scrollbar.set
+        
+        self.loading_bar = ttk.Progressbar(chat_area_frame, mode='indeterminate')
+        self.loading_bar.grid(row=1, column=0, columnspan=2, sticky="ew", pady=5)
         self.loading_bar.grid_remove()
 
-    def _on_input_text_change(self, event=None):
-        # Calculate the number of visible lines (including wrapped lines)
-        num_lines = self.input_text.count("1.0", "end", "displaylines")[0]
+        input_frame = ttk.Frame(chat_area_frame)
+        input_frame.grid(row=2, column=0, columnspan=2, sticky="ew", pady=10)
+        input_frame.columnconfigure(0, weight=1)
+
+        self.input_entry = tk.Text(input_frame, height=1, wrap="word", font=('Arial', 10))
+        self.input_entry.grid(row=0, column=0, sticky="ew")
+        self.input_entry.bind("<<Modified>>", self._on_input_modified)
+        self.input_entry.bind("<Return>", self.process_command)
+        self.input_entry.bind("<Shift-Return>", self._insert_newline)
+
+        self.input_scrollbar = ttk.Scrollbar(input_frame, orient=tk.VERTICAL, command=self.input_entry.yview)
+        self.input_entry['yscrollcommand'] = self.input_scrollbar.set
+
+        self.send_button = ttk.Button(input_frame, text="Enviar", command=self.process_command)
+        self.send_button.grid(row=0, column=2, padx=5)
         
-        if num_lines <= 10:
-            self.input_text.config(height=num_lines)
+        self.stop_button = ttk.Button(input_frame, text="Detener", command=self._on_stop_clicked)
+        self.stop_button.grid(row=0, column=3, padx=5)
+
+    def _on_input_modified(self, event=None):
+        num_lines = self.input_entry.count("1.0", "end", "displaylines")[0]
+        if num_lines <= 5:
+            self.input_entry.config(height=num_lines)
             self.input_scrollbar.grid_remove()
         else:
-            self.input_text.config(height=10)
+            self.input_entry.config(height=5)
             self.input_scrollbar.grid(row=0, column=1, sticky="ns")
+        self.input_entry.edit_modified(False) # Reset the modified flag
 
-    def _create_menu_bar(self):
-        menubar = tk.Menu(self.root)
-        self.root.config(menu=menubar)
-
-        file_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="Archivo", menu=file_menu)
-        file_menu.add_command(label="Salir", command=self.root.quit)
-
-        skills_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="Habilidades", menu=skills_menu)
-        skills_menu.add_command(label="Gestionar Habilidades", command=self._open_skill_manager_window)
-
-        models_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="Modelos", menu=models_menu)
-        models_menu.add_command(label="Gestionar Proveedores/Modelos", command=self._open_provider_manager_window)
-
-    def _open_skill_manager_window(self):
-        SkillManagerGUI(self.root)
+    def _insert_newline(self, event=None):
+        self.input_entry.insert(tk.INSERT, "\n")
+        return "break"
 
     def reload_providers_config(self, initial_load=False):
         self.providers_config = load_providers_from_db()
@@ -200,17 +191,21 @@ class InteractIAGUI:
             self.insert_log_message("Solicitud de parada de emergencia enviada.")
 
     def process_command(self, event=None):
-        command = self.input_text.get("1.0", tk.END).strip()
+        if event and event.state & 1: # Shift key is pressed
+            return self._insert_newline()
+            
+        command = self.input_entry.get("1.0", tk.END).strip()
         if not command or not self.agente or not self.agente.operativo:
-            return
+            return "break"
+            
         self.insert_message(command, 'user')
-        self.input_text.delete("1.0", tk.END)
-        self._on_input_text_change()
+        self.input_entry.delete("1.0", tk.END)
         self.loading_bar.grid()
         self.loading_bar.start(10)
         self.agente.establecer_objetivo(command)
         thread = threading.Thread(target=self.agente.stream_run)
         thread.start()
+        return "break"
 
     def _configure_chat_tags(self):
         self.chat_history_text.tag_configure('user', justify='right', background='#E0F7FA', relief='raised', borderwidth=1, lmargin1=60, lmargin2=60, spacing3=5)
