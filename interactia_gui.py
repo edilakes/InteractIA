@@ -22,9 +22,29 @@ class InteractIAGUI:
         self.agente = None
         self._agent_writing = False
 
+        self._create_menu()
         self._create_widgets()
         self._configure_chat_tags()
         self.reload_providers_config(initial_load=True)
+
+    def _create_menu(self):
+        self.menu_bar = tk.Menu(self.root)
+        self.root.config(menu=self.menu_bar)
+
+        # Menú Archivo
+        file_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.menu_bar.add_cascade(label="Archivo", menu=file_menu)
+        file_menu.add_command(label="Salir", command=self.root.quit)
+
+        # Menú Modelos
+        models_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.menu_bar.add_cascade(label="Modelos", menu=models_menu)
+        models_menu.add_command(label="Gestionar Proveedores...", command=self._open_provider_manager_window)
+
+        # Menú Conocimiento
+        knowledge_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.menu_bar.add_cascade(label="Conocimiento", menu=knowledge_menu)
+        # Aquí se pueden añadir más opciones en el futuro
 
     def _create_widgets(self):
         self.main_frame = ttk.Frame(self.root, padding="0")
