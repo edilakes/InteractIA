@@ -1,5 +1,4 @@
 from pymongo import MongoClient
-from bson.objectid import ObjectId
 from config import MONGO_URI, MONGODB_DATABASE_NAME, MONGODB_PROVIDERS_COLLECTION
 
 class ProviderDBManager:
@@ -9,63 +8,62 @@ class ProviderDBManager:
         self.collection = self.db[MONGODB_PROVIDERS_COLLECTION]
 
     def get_all_providers(self) -> list:
-        """Recupera todas las configuraciones de proveedores de la base de datos."""
-        providers = []
-        for doc in self.collection.find():
-            # Convert ObjectId to string for JSON serialization if needed later
-            if '_id' in doc:
-                doc['id'] = str(doc['_id'])
-                del doc['_id']
-            providers.append(doc)
-        return providers
+        """Recupera todos los documentos de proveedores."""
+        return list(self.collection.find())
 
-    def get_provider_by_id(self, provider_id: str) -> dict | None:
-        """Recupera una configuración de proveedor por su ID."""
-        # Assuming 'id' field in documents is the string representation of ObjectId
-        # or a custom string ID. If it's ObjectId, we need to convert.
-        try:
-            doc = self.collection.find_one({'_id': ObjectId(provider_id)})
-        except:
-            doc = self.collection.find_one({'id': provider_id})
+    def get_provider(self, provider_type: str) -> dict | None:
+        """Recupera un proveedor por su tipo."""
+        return self.collection.find_one({"provider_type": provider_type})
 
-        if doc and '_id' in doc:
-            doc['id'] = str(doc['_id'])
-            del doc['_id']
-        return doc
+    def add_api_key_config(self, provider_type: str, api_key_config: dict):
+        """Añade una nueva configuración de API key a un proveedor."""
+        return self.collection.update_one(
+            {"provider_type": provider_type},
+            {"$push": {"api_key_configs": api_key_config}},
+            upsert=True
+        )
 
-    def update_provider(self, provider_id: str, new_data: dict):
-        """Actualiza una configuración de proveedor existente."""
-        # Remove 'id' from new_data if it's present, as _id is immutable
-        data_to_update = new_data.copy()
-        if 'id' in data_to_update:
-            del data_to_update['id']
+    def update_api_key_config(self, provider_type: str, key_name: str, new_config: dict):
+        """Actualiza una configuración de API key existente."""
+        return self.collection.update_one(
+            {"provider_type": provider_type, "api_key_configs.name": key_name},
+            {"$set": {"api_key_configs.$": new_config}}
+        )
 
-        try:
-            result = self.collection.update_one({'_id': ObjectId(provider_id)}, {'$set': data_to_update})
-        except:
-            result = self.collection.update_one({'id': provider_id}, {'$set': data_to_update})
-        return result.modified_count > 0
+    def delete_api_key_config(self, provider_type: str, key_name: str):
+        """Elimina una configuración de API key."""
+        return self.collection.update_one(
+            {"provider_type": provider_type},
+            {"$pull": {"api_key_configs": {"name": key_name}}}
+        )
 
-    def insert_provider(self, provider_data: dict):
-        """Inserta una nueva configuración de proveedor."""
-        # If provider_data has an 'id' field, it might conflict with MongoDB's _id
-        # It's better to let MongoDB generate _id and use 'id' as a custom field if needed.
-        # For now, we'll remove 'id' if it's a string that looks like an ObjectId
-        # and let MongoDB generate _id.
-        data_to_insert = provider_data.copy()
-        if 'id' in data_to_insert and ObjectId.is_valid(data_to_insert['id']):
-            del data_to_insert['id'] # Let MongoDB generate _id
-        
-        result = self.collection.insert_one(data_to_insert)
-        return str(result.inserted_id)
+    def update_models_for_api_key(self, provider_type: str, key_name: str, models: list):
+        """Actualiza la lista de modelos para una API key específica."""
+        return self.collection.update_one(
+            {"provider_type": provider_type, "api_key_configs.name": key_name},
+            {"$set": {"api_key_configs.$.available_models": models}}
+        )
 
-    def delete_provider(self, provider_id: str):
-        """Elimina una configuración de proveedor por su ID."""
-        try:
-            result = self.collection.delete_one({'_id': ObjectId(provider_id)})
-        except:
-            result = self.collection.delete_one({'id': provider_id})
-        return result.deleted_count > 0
+    def set_last_used_model(self, provider_type: str, key_name: str, model_name: str):
+        """Marca un modelo como el último usado, y desmarca todos los demás."""
+        # Desmarcar cualquier otro modelo que estuviera como último usado
+        self.collection.update_many(
+            {"api_key_configs.available_models.is_last_used": True},
+            {"$set": {"api_key_configs.$[].available_models.$[].is_last_used": False}}
+        )
+        # Marcar el nuevo modelo como último usado
+        return self.collection.update_one(
+            {
+                "provider_type": provider_type,
+                "api_key_configs.name": key_name,
+                "api_key_configs.available_models.name": model_name
+            },
+            {"$set": {"api_key_configs.$[key].available_models.$[model].is_last_used": True}},
+            array_filters=[
+                {"key.name": key_name},
+                {"model.name": model_name}
+            ]
+        )
 
     def close_connection(self):
         """Cierra la conexión a la base de datos."""

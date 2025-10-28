@@ -3,11 +3,17 @@ from tkinter import ttk, messagebox
 import threading
 
 from agente import Agente
-from model_manager import load_providers_from_db, get_model_provider, get_default_provider_config, _update_last_used_model
+from model_manager import (
+    load_providers_from_db,
+    get_model_provider,
+    get_default_provider_config,
+    update_last_used_model
+)
 from gui_model_manager import ProviderManagerWindow
 
 class InteractIAGUI:
     def __init__(self, root, titulo="InteractIA - Agente Inteligente", id_objetivo=None):
+        print("Initializing InteractIAGUI...")
         self.root = root
         self.titulo_ventana = titulo
         self.id_objetivo = id_objetivo
@@ -56,21 +62,26 @@ class InteractIAGUI:
 
         top_frame = ttk.Frame(self.main_frame, padding=(10, 5, 10, 5))
         top_frame.grid(row=0, column=0, sticky="ew")
-        top_frame.columnconfigure(1, weight=1)
         top_frame.columnconfigure(3, weight=1)
+        top_frame.columnconfigure(5, weight=1)
 
         ttk.Label(top_frame, text="Proveedor:").grid(row=0, column=0, padx=(0, 5))
-        self.provider_selector = ttk.Combobox(top_frame, state="readonly")
-        self.provider_selector.grid(row=0, column=1, sticky="ew")
+        self.provider_selector = ttk.Combobox(top_frame, state="readonly", width=15)
+        self.provider_selector.grid(row=0, column=1)
         self.provider_selector.bind("<<ComboboxSelected>>", self._on_provider_selected)
 
-        ttk.Label(top_frame, text="Modelo:").grid(row=0, column=2, padx=(10, 5))
+        ttk.Label(top_frame, text="Nombre API:").grid(row=0, column=2, padx=(10, 5))
+        self.api_key_selector = ttk.Combobox(top_frame, state="disabled")
+        self.api_key_selector.grid(row=0, column=3, sticky="ew")
+        self.api_key_selector.bind("<<ComboboxSelected>>", self._on_api_key_selected)
+
+        ttk.Label(top_frame, text="Modelo:").grid(row=0, column=4, padx=(10, 5))
         self.model_selector = ttk.Combobox(top_frame, state="disabled")
-        self.model_selector.grid(row=0, column=3, sticky="ew")
+        self.model_selector.grid(row=0, column=5, sticky="ew")
         self.model_selector.bind("<<ComboboxSelected>>", self._on_model_selected)
 
         manage_button = ttk.Button(top_frame, text="Gestionar...", command=self._open_provider_manager_window)
-        manage_button.grid(row=0, column=4, padx=(10, 0))
+        manage_button.grid(row=0, column=6, padx=(10, 0))
 
         chat_area_frame = ttk.Frame(self.main_frame, padding=(10, 0, 10, 10))
         chat_area_frame.grid(row=1, column=0, sticky="nsew")
@@ -122,9 +133,13 @@ class InteractIAGUI:
         return "break"
 
     def reload_providers_config(self, initial_load=False):
-        self.providers_config = load_providers_from_db()
-        if not self.providers_config:
-            self.show_error_and_exit("No se encontraron proveedores en la base de datos.")
+        self.providers_data = load_providers_from_db()
+        
+        if not self.providers_data or not any(p.get("api_key_configs") for p in self.providers_data):
+            if initial_load:
+                self._prompt_for_initial_configuration()
+            else:
+                self.show_error_and_exit("No se encontraron configuraciones de API key.")
             return
         
         provider_names = [p['name'] for p in self.providers_config]
@@ -175,11 +190,11 @@ class InteractIAGUI:
     def _on_model_selected(self, event):
         self.selected_model = self.model_selector.get()
         if self.selected_model and self.selected_model != "Cargando...":
-            _update_last_used_model(self.selected_provider_config["id"], self.selected_model)
+            update_last_used_model(self.selected_provider_config["id"], self.selected_model)
             self._initialize_agent()
 
     def _initialize_agent(self):
-        if not self.selected_provider_config or not self.selected_model:
+        if not self.selected_key_config or not self.selected_model_name:
             return
         try:
             self.active_provider = get_model_provider(self.selected_provider_config)
@@ -187,22 +202,28 @@ class InteractIAGUI:
 
             self.agente = Agente(
                 model_provider=self.active_provider,
-                model_name=self.selected_model,
+                model_name=self.selected_model_name,
                 id_ventana=self.titulo_ventana,
                 id_objetivo=self.id_objetivo,
                 callback_hablar=self.mostrar_mensaje_agente,
                 callback_finalizar=self.finalizar_respuesta_agente,
                 callback_log=self.insert_log_message
             )
-            self.insert_log_message(f"Agente listo con {self.selected_provider_config['name']} y modelo {self.selected_model}")
+            print("DEBUG: After Agente constructor, before insert_log_message") # New print
+            self.insert_log_message(f"Agente listo con {self.api_key_selector.get()} y modelo {self.selected_model_name}")
+            print("DEBUG: After insert_log_message") # New print
         except Exception as e:
+            print(f"DEBUG: Exception caught in _initialize_agent: {e}") # New print statement
             self.show_error_and_exit(f"Error al inicializar agente: {e}")
 
     def _open_provider_manager_window(self):
-        ProviderManagerWindow(self.root, providers_config=self.providers_config)
+        ProviderManagerWindow(self.root)
 
     def show_error_and_exit(self, message):
         messagebox.showerror("Error Crítico", message, parent=self.root)
+        self.root.destroy()
+
+    def exit_application(self):
         self.root.destroy()
 
     def _on_stop_clicked(self):

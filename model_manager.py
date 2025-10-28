@@ -4,86 +4,69 @@ import google.generativeai as genai
 import json
 import re
 from PIL import Image
-
 from provider_db_manager import provider_db_manager
 
-# Helper function to write providers data to file (REMOVED - now handled by DB manager)
-# def _write_providers_to_file(providers_data: list, file_path: str = 'providers.json'):
-#     script_dir = os.path.dirname(os.path.abspath(__file__))
-#     absolute_file_path = os.path.join(script_dir, file_path)
-#     try:
-#         with open(absolute_file_path, 'w', encoding='utf-8') as f:
-#             json.dump(providers_data, f, indent=2)
-#     except IOError as e:
-#         print(f"ERROR al escribir en el archivo de proveedores '{absolute_file_path}': {e}")
-
 class ModelProvider(abc.ABC):
-    """Clase base abstracta para cualquier proveedor de modelos de IA."""
-
-    def __init__(self, provider_config: dict):
-        self.provider_config = provider_config
-        self.provider_id = provider_config.get("id")
+    """Clase base abstracta para un proveedor de modelos."""
+    def __init__(self, api_key_config: dict):
+        self.api_key_config = api_key_config
+        self.provider_type = None # Se debe establecer en la subclase
 
     @abc.abstractmethod
     def set_model(self, model_name: str):
-        """Configura el modelo específico a utilizar para las generaciones."""
         pass
 
     @abc.abstractmethod
     def list_models(self) -> list[str]:
-        """Devuelve una lista de los nombres de los modelos de chat disponibles."""
         pass
 
     @abc.abstractmethod
     def generate_content(self, prompt: str, image: Image.Image) -> dict:
-        """Genera una decisión estructurada (JSON) a partir de un prompt y una imagen."""
         pass
 
     @abc.abstractmethod
     def generate_text(self, prompt: str) -> str:
-        """Genera una respuesta de texto simple a partir de un prompt."""
         pass
 
     @abc.abstractmethod
     def refresh_available_models(self):
-        """Actualiza la lista de modelos disponibles para este proveedor."""
         pass
 
 class GeminiProvider(ModelProvider):
     """Proveedor para los modelos de Google Gemini."""
-    def __init__(self, provider_config: dict):
-        super().__init__(provider_config)
-        api_key_env_var = self.provider_config.get("config", {}).get("api_key_env")
+    def __init__(self, api_key_config: dict):
+        super().__init__(api_key_config)
+        self.provider_type = "gemini"
+        api_key_env_var = self.api_key_config.get("api_key_env_name")
+        if not api_key_env_var:
+            raise ValueError(f"La configuración de API key no especifica un 'api_key_env_name'.")
+        
         api_key = os.getenv(api_key_env_var)
         if not api_key:
-            raise ValueError(f"La variable de entorno '{api_key_env_var}' no está configurada para el proveedor {self.provider_id}.")
+            raise ValueError(f"La variable de entorno '{api_key_env_var}' no está configurada.")
+        
         genai.configure(api_key=api_key)
-        self.modelo = None # El modelo se establecerá después con set_model
+        self.modelo = None
 
     def set_model(self, model_name: str):
         self.modelo = genai.GenerativeModel(model_name)
-        _update_last_used_model(self.provider_id, model_name)
+        update_last_used_model(self.provider_type, self.api_key_config['name'], model_name)
 
     def list_models(self) -> list[str]:
-        """Devuelve una lista de los nombres de los modelos de chat disponibles desde la configuración estática."""
-        return [model["name"] for model in self.provider_config.get("available_models", [])]
+        return [model["name"] for model in self.api_key_config.get("available_models", [])]
 
     def _check_model_is_set(self):
         if not self.modelo:
-            raise RuntimeError("El modelo no ha sido establecido. Llama a set_model() antes de generar contenido.")
+            raise RuntimeError("El modelo no ha sido establecido. Llama a set_model() antes.")
 
     def generate_content(self, prompt: str, image: Image.Image) -> dict:
         self._check_model_is_set()
-        contenido = [prompt]
-        if image:
-            contenido.append(image)
         try:
-            respuesta = self.modelo.generate_content(contenido)
-            match = re.search(r'\{.*\}', respuesta.text, re.DOTALL)
+            response = self.modelo.generate_content([prompt, image] if image else [prompt])
+            match = re.search(r'\{.*\}', response.text, re.DOTALL)
             if match:
                 return json.loads(match.group(0))
-            else:
-                raise json.JSONDecodeError("No se encontró un objeto JSON en la respuesta.", respuesta.text, 0)
+            raise json.JSONDecodeError("No se encontró JSON en la respuesta.", response.text, 0)
         except Exception as e:
             print(f"ERROR en GeminiProvider (generate_content): {e}")
             raise
@@ -91,161 +74,105 @@ class GeminiProvider(ModelProvider):
     def generate_text(self, prompt: str) -> str:
         self._check_model_is_set()
         try:
-            respuesta = self.modelo.generate_content(prompt)
-            return respuesta.text.strip()
+            return self.modelo.generate_content(prompt).text.strip()
         except Exception as e:
             print(f"ERROR en GeminiProvider (generate_text): {e}")
             raise
 
     def refresh_available_models(self):
-        """Actualiza la lista de modelos disponibles para este proveedor desde la API de Gemini."""
-        print(f"Refrescando modelos para el proveedor {self.provider_id}...")
+        print(f"Refrescando modelos para {self.api_key_config.get('name')}...")
         try:
-            current_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+            current_model_names = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
             
-            # Get the current provider config from DB
-            provider_config = provider_db_manager.get_provider_by_id(self.provider_id)
-            if not provider_config:
-                print(f"ADVERTENCIA: No se encontró el proveedor '{self.provider_id}' en la base de datos para refrescar modelos.")
-                return
+            old_models = self.api_key_config.get("available_models", [])
+            last_used_model = next((m["name"] for m in old_models if m.get("is_last_used")), None)
 
-            # Preservar el estado de is_last_used si el modelo sigue existiendo
-            old_available_models = provider_config.get("available_models", [])
-            new_available_models = []
-            last_used_model_name = None
-
-            for old_model in old_available_models:
-                if old_model.get("is_last_used"):
-                    last_used_model_name = old_model.get("name")
-                    break
-
-            for model_name in current_models:
-                is_last_used = (model_name == last_used_model_name)
-                new_available_models.append({"name": model_name, "is_last_used": is_last_used})
+            new_models = [{"name": name, "is_last_used": name == last_used_model} for name in current_model_names]
             
-            # Si el last_used_model ya no existe, o no había uno, marcar el primero como last_used
-            if not any(model.get("is_last_used") for model in new_available_models) and new_available_models:
-                new_available_models[0]["is_last_used"] = True
+            if not any(m["is_last_used"] for m in new_models) and new_models:
+                new_models[0]["is_last_used"] = True
 
-            provider_config["available_models"] = new_available_models
-            
-            # Update the provider in the database
-            provider_db_manager.update_provider(self.provider_id, provider_config)
-            print(f"Modelos para {self.provider_id} actualizados correctamente en la base de datos.")
-
+            provider_db_manager.update_models_for_api_key(self.provider_type, self.api_key_config['name'], new_models)
+            print(f"Modelos para {self.api_key_config.get('name')} actualizados.")
         except Exception as e:
-            print(f"ERROR al refrescar modelos para {self.provider_id}: {e}")
+            print(f"ERROR al refrescar modelos: {e}")
 
-# --- Factory y Loader ---
+PROVIDER_MAP = {"gemini": GeminiProvider}
 
-_PROVIDER_MAP = {
-    "gemini": GeminiProvider
-}
-
-def _update_last_used_model(provider_id: str, model_name: str):
-    """Actualiza el flag is_last_used para el modelo y proveedor especificados en la base de datos."""
+def update_last_used_model(provider_type: str, key_name: str, model_name: str):
+    """Actualiza el flag is_last_used para el modelo especificado."""
     try:
-        provider_config = provider_db_manager.get_provider_by_id(provider_id)
-        if not provider_config:
-            print(f"ADVERTENCIA: No se encontró el proveedor '{provider_id}' en la base de datos para actualizar el estado de último usado.")
-            return
-
-        found = False
-        if "available_models" in provider_config:
-            for model in provider_config["available_models"]:
-                if model.get("name") == model_name:
-                    model["is_last_used"] = True
-                    found = True
-                else:
-                    model["is_last_used"] = False
-        
-        if found:
-            provider_db_manager.update_provider(provider_id, provider_config)
-        else:
-            print(f"ADVERTENCIA: No se encontró el modelo '{model_name}' para el proveedor '{provider_id}' al intentar actualizar el estado de último usado.")
-
+        provider_db_manager.set_last_used_model(provider_type, key_name, model_name)
     except Exception as e:
-        print(f"ERROR al actualizar el estado de último modelo usado en la base de datos: {e}")
+        print(f"ERROR al actualizar el último modelo usado: {e}")
 
 def load_providers_from_db() -> list:
-    """Carga la lista de configuraciones de proveedores desde la base de datos."""
-    try:
-        return provider_db_manager.get_all_providers()
-    except Exception as e:
-        print(f"ERROR al cargar proveedores desde la base de datos: {e}")
-        return []
+    """Carga todas las configuraciones de proveedores desde la base de datos."""
+    return provider_db_manager.get_all_providers()
 
-def get_default_provider_config() -> tuple[dict, str]:
-    """Obtiene la configuración del proveedor y el nombre del modelo por defecto o el último usado."""
+def get_default_provider_config() -> tuple[str, dict, str]:
+    """Obtiene el tipo de proveedor, la config de API key y el nombre del modelo por defecto."""
     providers = load_providers_from_db()
     if not providers:
-        raise RuntimeError("No se encontraron configuraciones de proveedores en la base de datos.")
+        raise RuntimeError("No se encontraron proveedores en la base de datos.")
 
-    default_provider_config = None
-    default_model_name = None
-
-    # Buscar el último modelo usado
-    for provider_config in providers:
-        if "available_models" in provider_config:
-            for model in provider_config["available_models"]:
+    # Buscar el último modelo usado explícitamente
+    for provider in providers:
+        for key_config in provider.get("api_key_configs", []):
+            for model in key_config.get("available_models", []):
                 if model.get("is_last_used"):
-                    default_provider_config = provider_config
-                    default_model_name = model["name"]
-                    break
-        if default_provider_config:
-            break
+                    return provider["provider_type"], key_config, model["name"]
 
-    # Si no se encontró un último modelo usado, tomar el primero disponible
-    if not default_provider_config:
-        for provider_config in providers:
-            if "available_models" in provider_config and provider_config["available_models"]:
-                default_provider_config = provider_config
-                default_model_name = provider_config["available_models"][0]["name"]
-                break
+    # Si no hay ninguno, tomar el primero disponible
+    for provider in providers:
+        if provider.get("api_key_configs"):
+            key_config = provider["api_key_configs"][0]
+            if key_config.get("available_models"):
+                model = key_config["available_models"][0]
+                return provider["provider_type"], key_config, model["name"]
     
-    if not default_provider_config or not default_model_name:
-        raise RuntimeError("No se pudo determinar una configuración de proveedor y modelo por defecto.")
+    raise RuntimeError("No se pudo determinar una configuración de proveedor y modelo por defecto.")
 
-    return default_provider_config, default_model_name
-
-def get_model_provider(provider_config: dict = None) -> ModelProvider:
-    """Factory que devuelve una instancia del proveedor según la configuración.
-    Si no se proporciona provider_config, intenta cargar el último usado o el por defecto.
+def get_model_provider(provider_type: str = None, api_key_config: dict = None) -> ModelProvider:
+    """Factory que devuelve una instancia del proveedor.
+    Si no se proporcionan argumentos, carga la configuración por defecto.
     """
-    selected_provider_config = provider_config
+    selected_provider_type = provider_type
+    selected_api_key_config = api_key_config
     selected_model_name = None
 
-    if selected_provider_config is None:
-        selected_provider_config, selected_model_name = get_default_provider_config()
+    if not selected_provider_type or not selected_api_key_config:
+        selected_provider_type, selected_api_key_config, selected_model_name = get_default_provider_config()
 
-    provider_type = selected_provider_config.get("provider_type")
-    if provider_type not in _PROVIDER_MAP:
-        raise ValueError(f"Tipo de proveedor '{provider_type}' no soportado.")
+    ProviderClass = PROVIDER_MAP.get(selected_provider_type)
+    if not ProviderClass:
+        raise ValueError(f"Tipo de proveedor '{selected_provider_type}' no soportado.")
 
-    ProviderClass = _PROVIDER_MAP[provider_type]
-    # Pasar la configuración completa del proveedor a la instancia del proveedor
-    instance = ProviderClass(provider_config=selected_provider_config)
+    instance = ProviderClass(api_key_config=selected_api_key_config)
     
-    # Si se obtuvo un selected_model_name del default, establecerlo
-    if selected_model_name:
-        instance.set_model(selected_model_name)
+    model_to_set = selected_model_name
+    if not model_to_set and selected_api_key_config.get("available_models"):
+        model_to_set = selected_api_key_config["available_models"][0]["name"]
+    
+    if model_to_set:
+        instance.set_model(model_to_set)
 
     return instance
 
-def refresh_provider_models(provider_id: str):
-    """Refresca la lista de modelos disponibles para un proveedor específico.
-    Esta función puede ser llamada desde la GUI para actualizar los modelos.
-    """
-    # Get the provider instance to call its refresh_available_models method
-    # We need to load the provider config from DB first
-    provider_config = provider_db_manager.get_provider_by_id(provider_id)
-    if not provider_config:
-        print(f"ADVERTENCIA: No se encontró el proveedor con ID '{provider_id}' para refrescar modelos.")
+def refresh_provider_models(provider_type: str, key_name: str):
+    """Refresca los modelos para una configuración de API key específica."""
+    provider = provider_db_manager.get_provider(provider_type)
+    if not provider:
+        print(f"ADVERTENCIA: No se encontró el proveedor '{provider_type}'.")
+        return
+
+    key_config = next((k for k in provider.get("api_key_configs", []) if k['name'] == key_name), None)
+    if not key_config:
+        print(f"ADVERTENCIA: No se encontró la config de API key '{key_name}'.")
         return
 
     try:
-        # Create a temporary instance of the provider to call refresh_available_models
-        provider_instance = get_model_provider(provider_config=provider_config)
+        provider_instance = get_model_provider(provider_type, key_config)
         provider_instance.refresh_available_models()
     except Exception as e:
-        print(f"ERROR al intentar refrescar modelos para el proveedor {provider_id}: {e}")
+        print(f"ERROR al refrescar modelos para {key_name}: {e}")

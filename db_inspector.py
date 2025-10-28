@@ -15,7 +15,7 @@ load_dotenv()
 # --- Configuración ---
 MONGO_URI = os.getenv("MONGO_URI")
 MONGODB_DATABASE_NAME = "interactia_db"
-COLLECTION_TO_INSPECT = "habilidades"
+COLLECTION_TO_INSPECT = "providers_config"
 
 # --- Script ---
 if not MONGO_URI or "SU_CADENA_DE_CONEXION" in MONGO_URI:
