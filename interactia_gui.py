@@ -21,17 +21,23 @@ class InteractIAGUI:
         self.root.geometry("800x600")
 
         # --- Estado de la App ---
-        self.providers_config = []
+        self.providers_data = []
         self.selected_provider_config = None
+        self.selected_key_config = None
         self.active_provider = None
         self.selected_model = None
         self.agente = None
         self._agent_writing = False
+        self._loading_config = True # Flag to prevent events during setup
 
         self._create_menu()
         self._create_widgets()
         self._configure_chat_tags()
         self.reload_providers_config(initial_load=True)
+
+    def start_gui(self):
+        """Makes the GUI visible after initialization."""
+        self.root.deiconify()
 
     def _create_menu(self):
         self.menu_bar = tk.Menu(self.root)
@@ -126,13 +132,14 @@ class InteractIAGUI:
         else:
             self.input_entry.config(height=5)
             self.input_scrollbar.grid(row=0, column=1, sticky="ns")
-        self.input_entry.edit_modified(False) # Reset the modified flag
+        self.input_entry.edit_modified(False)
 
     def _insert_newline(self, event=None):
         self.input_entry.insert(tk.INSERT, "\n")
         return "break"
 
     def reload_providers_config(self, initial_load=False):
+        self._loading_config = True
         self.providers_data = load_providers_from_db()
         
         if not self.providers_data or not any(p.get("api_key_configs") for p in self.providers_data):
@@ -142,82 +149,117 @@ class InteractIAGUI:
                 self.show_error_and_exit("No se encontraron configuraciones de API key.")
             return
         
-        provider_names = [p['name'] for p in self.providers_config]
-        self.provider_selector['values'] = provider_names
+        self.provider_selector['values'] = [p['name'] for p in self.providers_data]
 
-        default_provider_config, default_model_name = get_default_provider_config()
-        
-        self.provider_selector.set(default_provider_config['name'])
-        self.selected_provider_config = default_provider_config
-
-        self._update_models_dropdown(default_model_name)
-        
-        self._initialize_agent()
-
-    def _on_provider_selected(self, event):
-        selected_name = self.provider_selector.get()
-        self.selected_provider_config = next(p for p in self.providers_config if p['name'] == selected_name)
-        self.insert_log_message(f"Proveedor seleccionado: {selected_name}. Cargando modelos...")
-        
-        last_used_model_name = None
-        if "available_models" in self.selected_provider_config:
-            for model in self.selected_provider_config["available_models"]:
-                if model.get("is_last_used"):
-                    last_used_model_name = model["name"]
-                    break
-        
-        self._update_models_dropdown(last_used_model_name)
-        self._initialize_agent()
-
-    def _update_models_dropdown(self, model_to_select: str = None):
-        available_models_names = [model["name"] for model in self.selected_provider_config.get("available_models", [])]
-        
-        if available_models_names:
-            self.model_selector['values'] = available_models_names
-            self.model_selector.config(state="readonly")
+        try:
+            default_provider_type, default_key_config, default_model_name = get_default_provider_config()
             
-            if model_to_select and model_to_select in available_models_names:
-                self.model_selector.set(model_to_select)
-            else:
-                self.model_selector.set(available_models_names[0])
-            
-            self.selected_model = self.model_selector.get()
-        else:
-            self.model_selector.set("No se encontraron modelos")
-            self.model_selector.config(state="disabled")
-            self.selected_model = None
+            default_provider = next((p for p in self.providers_data if p["provider_type"] == default_provider_type), None)
+            if default_provider:
+                self.provider_selector.set(default_provider['name'])
+                self._on_provider_selected(None)
+                
+                if default_key_config and default_key_config['name'] in self.api_key_selector['values']:
+                    self.api_key_selector.set(default_key_config['name'])
+                    self._on_api_key_selected(None)
 
-    def _on_model_selected(self, event):
-        self.selected_model = self.model_selector.get()
-        if self.selected_model and self.selected_model != "Cargando...":
-            update_last_used_model(self.selected_provider_config["id"], self.selected_model)
+                if default_model_name and default_model_name in self.model_selector['values']:
+                    self.model_selector.set(default_model_name)
+                    self._on_model_selected(None)
+
+        except (RuntimeError, StopIteration) as e:
+            self.insert_log_message(f"No se encontró configuración por defecto, usando la primera disponible: {e}")
+            if self.provider_selector['values']:
+                self.provider_selector.set(self.provider_selector['values'][0])
+                self._on_provider_selected(None)
+        
+        finally:
+            self._loading_config = False
             self._initialize_agent()
 
+    def _on_provider_selected(self, event=None):
+        selected_name = self.provider_selector.get()
+        self.selected_provider_config = next((p for p in self.providers_data if p['name'] == selected_name), None)
+        
+        if not self.selected_provider_config: return
+
+        api_key_names = [kc['name'] for kc in self.selected_provider_config.get("api_key_configs", [])]
+        self.api_key_selector['values'] = api_key_names
+        
+        if api_key_names:
+            self.api_key_selector.config(state="readonly")
+            self.api_key_selector.set(api_key_names[0])
+        else:
+            self.api_key_selector.set("")
+            self.api_key_selector.config(state="disabled")
+
+        self._on_api_key_selected(None)
+
+    def _on_api_key_selected(self, event=None):
+        selected_key_name = self.api_key_selector.get()
+        if not selected_key_name or not self.selected_provider_config:
+            self.selected_key_config = None
+        else:
+            self.selected_key_config = next((kc for kc in self.selected_provider_config.get('api_key_configs', []) if kc['name'] == selected_key_name), None)
+        
+        if not self.selected_key_config:
+            model_names = []
+        else:
+            model_names = [m['name'] for m in self.selected_key_config.get("available_models", [])]
+
+        self.model_selector['values'] = model_names
+        if model_names:
+            self.model_selector.config(state="readonly")
+            self.model_selector.set(model_names[0])
+        else:
+            self.model_selector.set("")
+            self.model_selector.config(state="disabled")
+        
+        self._on_model_selected(None)
+
+    def _on_model_selected(self, event=None):
+        self.selected_model = self.model_selector.get()
+        if self._loading_config: return
+
+        if self.selected_model and self.selected_provider_config and self.selected_key_config:
+            try:
+                update_last_used_model(
+                    self.selected_provider_config["provider_type"], 
+                    self.selected_key_config["name"], 
+                    self.selected_model
+                )
+            except Exception as e:
+                self.insert_log_message(f"Error al guardar último modelo: {e}")
+        
+        self._initialize_agent()
+
     def _initialize_agent(self):
-        if not self.selected_key_config or not self.selected_model_name:
+        if self._loading_config or not self.selected_provider_config or not self.selected_key_config or not self.selected_model:
             return
         try:
-            self.active_provider = get_model_provider(self.selected_provider_config)
+            self.insert_log_message(f"Inicializando agente con {self.selected_key_config['name']} y modelo {self.selected_model}...")
+            self.active_provider = get_model_provider(
+                self.selected_provider_config['provider_type'], 
+                self.selected_key_config
+            )
             self.active_provider.set_model(self.selected_model)
 
             self.agente = Agente(
                 model_provider=self.active_provider,
-                model_name=self.selected_model_name,
+                model_name=self.selected_model,
                 id_ventana=self.titulo_ventana,
                 id_objetivo=self.id_objetivo,
                 callback_hablar=self.mostrar_mensaje_agente,
                 callback_finalizar=self.finalizar_respuesta_agente,
                 callback_log=self.insert_log_message
             )
-            print("DEBUG: After Agente constructor, before insert_log_message") # New print
-            self.insert_log_message(f"Agente listo con {self.api_key_selector.get()} y modelo {self.selected_model_name}")
-            print("DEBUG: After insert_log_message") # New print
+            self.insert_log_message("Agente listo.")
         except Exception as e:
-            print(f"DEBUG: Exception caught in _initialize_agent: {e}") # New print statement
             self.show_error_and_exit(f"Error al inicializar agente: {e}")
 
     def _open_provider_manager_window(self):
         ProviderManagerWindow(self.root)
+        self.reload_providers_config()
 
     def show_error_and_exit(self, message):
         messagebox.showerror("Error Crítico", message, parent=self.root)
@@ -232,20 +274,27 @@ class InteractIAGUI:
             self.insert_log_message("Solicitud de parada de emergencia enviada.")
 
     def process_command(self, event=None):
-        if event and event.state & 1: # Shift key is pressed
+        if event and event.state & 1:
             return self._insert_newline()
             
         command = self.input_entry.get("1.0", tk.END).strip()
-        if not command or not self.agente or not self.agente.operativo:
+        if not command or not self.agente:
             return "break"
             
         self.insert_message(command, 'user')
         self.input_entry.delete("1.0", tk.END)
         self.loading_bar.grid()
         self.loading_bar.start(10)
-        self.agente.establecer_objetivo(command)
-        thread = threading.Thread(target=self.agente.stream_run)
-        thread.start()
+        
+        if not self.agente.operativo:
+             self.agente.establecer_objetivo(command)
+             thread = threading.Thread(target=self.agente.stream_run)
+             thread.start()
+        else:
+            # If agent is already running, this could be a follow-up message
+            # The current agent design might not support this, but we can send it.
+            self.agente.establecer_objetivo(command)
+
         return "break"
 
     def _configure_chat_tags(self):
@@ -295,6 +344,14 @@ class InteractIAGUI:
         self.chat_history_text.config(state='disabled')
         self.chat_history_text.see(tk.END)
         self._agent_writing = False
+    
+    def _prompt_for_initial_configuration(self):
+        if messagebox.askyesno("Configuración Inicial", 
+                               "No se encontraron proveedores de modelos. ¿Deseas abrir el gestor para configurarlos ahora?",
+                               parent=self.root):
+            self._open_provider_manager_window()
+        else:
+            self.show_error_and_exit("La aplicación no puede funcionar sin proveedores de modelos configurados.")
 
 if __name__ == "__main__":
     root = tk.Tk()
