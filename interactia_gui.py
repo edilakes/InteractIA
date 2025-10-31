@@ -29,6 +29,7 @@ class InteractIAGUI:
         self.agente = None
         self._agent_writing = False
         self._loading_config = True # Flag to prevent events during setup
+        self._agent_thread = None
 
         self._create_menu()
         self._create_widgets()
@@ -94,8 +95,9 @@ class InteractIAGUI:
         chat_area_frame.rowconfigure(0, weight=1)
         chat_area_frame.columnconfigure(0, weight=1)
         
-        self.chat_history_text = tk.Text(chat_area_frame, wrap="word", state='disabled', font=('Arial', 10))
+        self.chat_history_text = tk.Text(chat_area_frame, wrap="word", state='normal', font=('Arial', 10))
         self.chat_history_text.grid(row=0, column=0, sticky="nsew")
+        self.chat_history_text.bind("<Key>", lambda e: "break")
         
         self.scrollbar = ttk.Scrollbar(chat_area_frame, orient=tk.VERTICAL, command=self.chat_history_text.yview)
         self.scrollbar.grid(row=0, column=1, sticky="ns")
@@ -142,7 +144,7 @@ class InteractIAGUI:
         self._loading_config = True
         self.providers_data = load_providers_from_db()
         
-        if not self.providers_data or not any(p.get("api_key_configs") for p in self.providers_data):
+        if not self.providers_data or not any(p.get("api_keys") for p in self.providers_data):
             if initial_load:
                 self._prompt_for_initial_configuration()
             else:
@@ -157,15 +159,23 @@ class InteractIAGUI:
             default_provider = next((p for p in self.providers_data if p["provider_type"] == default_provider_type), None)
             if default_provider:
                 self.provider_selector.set(default_provider['name'])
-                self._on_provider_selected(None)
                 
-                if default_key_config and default_key_config['name'] in self.api_key_selector['values']:
-                    self.api_key_selector.set(default_key_config['name'])
-                    self._on_api_key_selected(None)
+                if default_key_config and default_key_config['name'] in [kc['name'] for kc in default_provider.get("api_keys", [])]:
+                    pass
 
-                if default_model_name and default_model_name in self.model_selector['values']:
-                    self.model_selector.set(default_model_name)
-                    self._on_model_selected(None)
+                if default_model_name:
+                    pass
+            
+            self._on_provider_selected(None)
+
+            if default_provider and default_key_config and default_key_config['name'] in self.api_key_selector['values']:
+                self.api_key_selector.set(default_key_config['name'])
+                self._on_api_key_selected(None)
+
+            if default_model_name and default_model_name in self.model_selector['values']:
+                self.model_selector.set(default_model_name)
+                self._on_model_selected(None)
+
 
         except (RuntimeError, StopIteration) as e:
             self.insert_log_message(f"No se encontró configuración por defecto, usando la primera disponible: {e}")
@@ -178,44 +188,52 @@ class InteractIAGUI:
             self._initialize_agent()
 
     def _on_provider_selected(self, event=None):
+        self.api_key_selector.set('')
+        self.api_key_selector['values'] = []
+        self.api_key_selector.config(state="disabled")
+        
+        self.model_selector.set('')
+        self.model_selector['values'] = []
+        self.model_selector.config(state="disabled")
+
         selected_name = self.provider_selector.get()
         self.selected_provider_config = next((p for p in self.providers_data if p['name'] == selected_name), None)
         
-        if not self.selected_provider_config: return
+        if not self.selected_provider_config:
+            return
 
-        api_key_names = [kc['name'] for kc in self.selected_provider_config.get("api_key_configs", [])]
+        api_key_names = [kc['name'] for kc in self.selected_provider_config.get("api_keys", [])]
         self.api_key_selector['values'] = api_key_names
         
         if api_key_names:
             self.api_key_selector.config(state="readonly")
             self.api_key_selector.set(api_key_names[0])
+            self._on_api_key_selected(None)
         else:
-            self.api_key_selector.set("")
-            self.api_key_selector.config(state="disabled")
+            self._on_api_key_selected(None)
 
-        self._on_api_key_selected(None)
 
     def _on_api_key_selected(self, event=None):
+        self.model_selector.set('')
+        self.model_selector['values'] = []
+        self.model_selector.config(state="disabled")
+
         selected_key_name = self.api_key_selector.get()
         if not selected_key_name or not self.selected_provider_config:
             self.selected_key_config = None
         else:
-            self.selected_key_config = next((kc for kc in self.selected_provider_config.get('api_key_configs', []) if kc['name'] == selected_key_name), None)
+            self.selected_key_config = next((kc for kc in self.selected_provider_config.get('api_keys', []) if kc['name'] == selected_key_name), None)
         
-        if not self.selected_key_config:
-            model_names = []
-        else:
-            model_names = [m['name'] for m in self.selected_key_config.get("available_models", [])]
+        if self.selected_key_config:
+            model_names = [m['name'] for m in self.selected_key_config.get("models", [])]
+            self.model_selector['values'] = model_names
+            
+            if model_names:
+                self.model_selector.config(state="readonly")
+                self.model_selector.set(model_names[0])
 
-        self.model_selector['values'] = model_names
-        if model_names:
-            self.model_selector.config(state="readonly")
-            self.model_selector.set(model_names[0])
-        else:
-            self.model_selector.set("")
-            self.model_selector.config(state="disabled")
-        
         self._on_model_selected(None)
+
 
     def _on_model_selected(self, event=None):
         self.selected_model = self.model_selector.get()
@@ -259,13 +277,15 @@ class InteractIAGUI:
 
     def _open_provider_manager_window(self):
         ProviderManagerWindow(self.root)
-        self.reload_providers_config()
 
     def show_error_and_exit(self, message):
         messagebox.showerror("Error Crítico", message, parent=self.root)
         self.root.destroy()
 
     def exit_application(self):
+        if self._agent_thread and self._agent_thread.is_alive():
+            self.agente.detener_proceso_emergencia()
+            self._agent_thread.join(timeout=2) # Esperar un poco a que el hilo termine
         self.root.destroy()
 
     def _on_stop_clicked(self):
@@ -280,20 +300,19 @@ class InteractIAGUI:
         command = self.input_entry.get("1.0", tk.END).strip()
         if not command or not self.agente:
             return "break"
+
+        if self._agent_thread and self._agent_thread.is_alive():
+            self.insert_log_message("El agente ya está procesando una tarea. Usa 'Detener' o espera a que termine.")
+            return "break"
             
         self.insert_message(command, 'user')
         self.input_entry.delete("1.0", tk.END)
         self.loading_bar.grid()
         self.loading_bar.start(10)
         
-        if not self.agente.operativo:
-             self.agente.establecer_objetivo(command)
-             thread = threading.Thread(target=self.agente.stream_run)
-             thread.start()
-        else:
-            # If agent is already running, this could be a follow-up message
-            # The current agent design might not support this, but we can send it.
-            self.agente.establecer_objetivo(command)
+        self.agente.establecer_objetivo(command)
+        self._agent_thread = threading.Thread(target=self.agente.stream_run)
+        self._agent_thread.start()
 
         return "break"
 
@@ -305,18 +324,14 @@ class InteractIAGUI:
     def insert_message(self, message, role):
         from datetime import datetime
         timestamp = datetime.now().strftime("%H:%M:%S")
-        self.chat_history_text.config(state='normal')
         self.chat_history_text.insert(tk.END, f"[{timestamp}] {message}\n\n", role)
-        self.chat_history_text.config(state='disabled')
         self.chat_history_text.see(tk.END)
 
     def insert_log_message(self, message):
         self.root.after(0, self._insert_log_message, message)
 
     def _insert_log_message(self, message):
-        self.chat_history_text.config(state='normal')
         self.chat_history_text.insert(tk.END, f"{message}\n", 'log')
-        self.chat_history_text.config(state='disabled')
         self.chat_history_text.see(tk.END)
 
     def mostrar_mensaje_agente(self, token):
@@ -327,7 +342,6 @@ class InteractIAGUI:
 
     def _insert_agent_token(self, token):
         from datetime import datetime
-        self.chat_history_text.config(state='normal')
         if not self._agent_writing:
             timestamp = datetime.now().strftime("%H:%M:%S")
             self.chat_history_text.insert(tk.END, f"Agente [{timestamp}]: ", 'agent')
@@ -335,15 +349,15 @@ class InteractIAGUI:
             self.loading_bar.stop()
             self.loading_bar.grid_remove()
         self.chat_history_text.insert(tk.END, token, 'agent')
-        self.chat_history_text.config(state='disabled')
         self.chat_history_text.see(tk.END)
 
     def _finalize_agent_response(self):
-        self.chat_history_text.config(state='normal')
         self.chat_history_text.insert(tk.END, "\n\n", 'agent')
-        self.chat_history_text.config(state='disabled')
         self.chat_history_text.see(tk.END)
         self._agent_writing = False
+        self.loading_bar.stop()
+        self.loading_bar.grid_remove()
+        self._agent_thread = None
     
     def _prompt_for_initial_configuration(self):
         if messagebox.askyesno("Configuración Inicial", 
@@ -356,4 +370,5 @@ class InteractIAGUI:
 if __name__ == "__main__":
     root = tk.Tk()
     app = InteractIAGUI(root)
+    root.protocol("WM_DELETE_WINDOW", app.exit_application)
     root.mainloop()

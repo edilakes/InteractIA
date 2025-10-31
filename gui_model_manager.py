@@ -141,8 +141,8 @@ class ProviderManagerWindow(tk.Toplevel):
         last_used_provider = None
         last_used_key = None
         for provider in self.providers_data:
-            for key_config in provider.get("api_key_configs", []):
-                if any(m.get("is_last_used") for m in key_config.get("available_models", [])):
+            for key_config in provider.get("api_keys", []):
+                if any(m.get("is_last_used") for m in key_config.get("models", [])):
                     last_used_provider = provider["provider_type"]
                     last_used_key = key_config["name"]
                     break
@@ -162,7 +162,7 @@ class ProviderManagerWindow(tk.Toplevel):
         
         key_names = []
         if provider:
-            key_names = [k["name"] for k in provider.get("api_key_configs", [])]
+            key_names = [k["name"] for k in provider.get("api_keys", [])]
 
         self.api_key_combo["values"] = key_names
         self.models_listbox.delete(0, tk.END)
@@ -183,13 +183,13 @@ class ProviderManagerWindow(tk.Toplevel):
         if not provider or not key_name:
             return
 
-        key_config = next((k for k in provider.get("api_key_configs", []) if k["name"] == key_name), None)
+        key_config = next((k for k in provider.get("api_keys", []) if k["name"] == key_name), None)
         self.models_listbox.delete(0, tk.END)
-        if not key_config or not key_config.get("available_models"):
+        if not key_config or not key_config.get("models"):
             return
 
         last_used_model_idx = -1
-        for i, model in enumerate(key_config["available_models"]):
+        for i, model in enumerate(key_config["models"]):
             self.models_listbox.insert(tk.END, model["name"])
             if model.get("is_last_used"):
                 last_used_model_idx = i
@@ -225,7 +225,7 @@ class ProviderManagerWindow(tk.Toplevel):
             return
 
         provider = next((p for p in self.providers_data if p["provider_type"] == provider_type), None)
-        key_config = next((k for k in provider["api_key_configs"] if k["name"] == key_name), None)
+        key_config = next((k for k in provider["api_keys"] if k["name"] == key_name), None)
 
         dialog = ApiKeyEditDialog(self, provider_type, key_data=key_config)
         if dialog.result:

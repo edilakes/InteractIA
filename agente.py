@@ -85,7 +85,6 @@ class Agente:
         self.parada_emergencia.set()
         self.logger.warning("¡PARADA DE EMERGENCIA ACTIVADA!")
 
-    # ... (El resto de la clase no cambia)
     def _call_model(self, prompt: str, image=None) -> dict:
         self.logger.info("Esperando el bloqueo de la API del modelo...")
         with model_api_lock:
@@ -93,6 +92,18 @@ class Agente:
             try:
                 decision = self.model_provider.generate_content(prompt, image)
                 self.logger.debug(f"Respuesta del modelo: {decision}")
+                
+                # Asegurarse de que la decisión sea un diccionario
+                if not isinstance(decision, dict):
+                    # Si no es un dict, podría ser un string con JSON, o texto plano.
+                    # Intentamos cargarlo como JSON
+                    try:
+                        decision = json.loads(decision)
+                    except (json.JSONDecodeError, TypeError):
+                        # Si falla, lo envolvemos en un diccionario de acción nula
+                        self.logger.warning(f"La respuesta del modelo no fue un JSON válido: {decision}")
+                        return {"accion": None, "razon": "La respuesta del modelo no fue un JSON válido.", "respuesta_original": str(decision)}
+
                 return decision
             except Exception as e:
                 self.logger.error(f"ERROR al llamar al proveedor del modelo de IA: {e}", exc_info=True)

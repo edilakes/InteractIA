@@ -43,6 +43,20 @@ else:
                 print("---")
             print(f"--- Fin del Contenido ({len(documentos)} documentos) ---")
 
+            print("\n--- Verificación de Environment Variables ---")
+            for doc in documentos:
+                for provider in doc.get("providers", []):
+                    for key_config in provider.get("api_keys", []):
+                        env_var_name = key_config.get("api_key_env_name")
+                        if env_var_name:
+                            env_var_value = os.getenv(env_var_name)
+                            if env_var_value:
+                                print(f"(+) La variable de entorno '{env_var_name}' para la clave '{key_config.get('name')}' está configurada.")
+                            else:
+                                print(f"(-) ADVERTENCIA: La variable de entorno '{env_var_name}' para la clave '{key_config.get('name')}' NO está configurada.")
+                        else:
+                            print(f"(-) ADVERTENCIA: No se encontró 'api_key_env_name' para la clave '{key_config.get('name')}'.")
+
     except pymongo.errors.ConnectionFailure as e:
         print(f"Error de conexión a MongoDB: {e}")
     except Exception as e:

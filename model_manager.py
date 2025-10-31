@@ -21,11 +21,7 @@ class ModelProvider(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def generate_content(self, prompt: str, image: Image.Image) -> dict:
-        pass
-
-    @abc.abstractmethod
-    def generate_text(self, prompt: str) -> str:
+    def generate_content(self, prompt: str, image: Image.Image = None) -> dict:
         pass
 
     @abc.abstractmethod
@@ -37,13 +33,14 @@ class GeminiProvider(ModelProvider):
     def __init__(self, api_key_config: dict):
         super().__init__(api_key_config)
         self.provider_type = "gemini"
+        
         api_key_env_var = self.api_key_config.get("api_key_env_name")
         if not api_key_env_var:
-            raise ValueError(f"La configuración de API key no especifica un 'api_key_env_name'.")
-        
+            raise ValueError("La configuración de API key no especifica 'api_key_env_name'.")
+
         api_key = os.getenv(api_key_env_var)
         if not api_key:
-            raise ValueError(f"La variable de entorno '{api_key_env_var}' no está configurada.")
+            raise ValueError(f"La variable de entorno '{api_key_env_var}' no está configurada o está vacía.")
         
         genai.configure(api_key=api_key)
         self.modelo = None
@@ -53,38 +50,40 @@ class GeminiProvider(ModelProvider):
         update_last_used_model(self.provider_type, self.api_key_config['name'], model_name)
 
     def list_models(self) -> list[str]:
-        return [model["name"] for model in self.api_key_config.get("available_models", [])]
+        return [model["name"] for model in self.api_key_config.get("models", [])]
 
     def _check_model_is_set(self):
         if not self.modelo:
             raise RuntimeError("El modelo no ha sido establecido. Llama a set_model() antes.")
 
-    def generate_content(self, prompt: str, image: Image.Image) -> dict:
+    def generate_content(self, prompt: str, image: Image.Image = None) -> dict:
         self._check_model_is_set()
         try:
-            response = self.modelo.generate_content([prompt, image] if image else [prompt])
+            args = [prompt]
+            if image:
+                args.append(image)
+            
+            response = self.modelo.generate_content(args)
+            
             match = re.search(r'\{.*\}', response.text, re.DOTALL)
             if match:
-                return json.loads(match.group(0))
-            raise json.JSONDecodeError("No se encontró JSON en la respuesta.", response.text, 0)
+                try:
+                    return json.loads(match.group(0))
+                except json.JSONDecodeError:
+                    return {"text": response.text}
+            
+            return {"text": response.text}
+
         except Exception as e:
             print(f"ERROR en GeminiProvider (generate_content): {e}")
-            raise
-
-    def generate_text(self, prompt: str) -> str:
-        self._check_model_is_set()
-        try:
-            return self.modelo.generate_content(prompt).text.strip()
-        except Exception as e:
-            print(f"ERROR en GeminiProvider (generate_text): {e}")
-            raise
+            return {"error": str(e)}
 
     def refresh_available_models(self):
         print(f"Refrescando modelos para {self.api_key_config.get('name')}...")
         try:
             current_model_names = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
             
-            old_models = self.api_key_config.get("available_models", [])
+            old_models = self.api_key_config.get("models", [])
             last_used_model = next((m["name"] for m in old_models if m.get("is_last_used")), None)
 
             new_models = [{"name": name, "is_last_used": name == last_used_model} for name in current_model_names]
@@ -116,27 +115,26 @@ def get_default_provider_config() -> tuple[str, dict, str]:
     if not providers:
         raise RuntimeError("No se encontraron proveedores en la base de datos.")
 
-    # Buscar el último modelo usado explícitamente
+    # Prioritize the last used model
     for provider in providers:
-        for key_config in provider.get("api_key_configs", []):
-            for model in key_config.get("available_models", []):
+        for key_config in provider.get("api_keys", []):
+            for model in key_config.get("models", []):
                 if model.get("is_last_used"):
                     return provider["provider_type"], key_config, model["name"]
 
-    # Si no hay ninguno, tomar el primero disponible
+    # If no last used model, find the first valid key
     for provider in providers:
-        if provider.get("api_key_configs"):
-            key_config = provider["api_key_configs"][0]
-            if key_config.get("available_models"):
-                model = key_config["available_models"][0]
-                return provider["provider_type"], key_config, model["name"]
-    
+        for key_config in provider.get("api_keys", []):
+            api_key_env_name = key_config.get("api_key_env_name")
+            if api_key_env_name and os.getenv(api_key_env_name):
+                if key_config.get("models"):
+                    model = key_config["models"][0]
+                    return provider["provider_type"], key_config, model["name"]
+
     raise RuntimeError("No se pudo determinar una configuración de proveedor y modelo por defecto.")
 
 def get_model_provider(provider_type: str = None, api_key_config: dict = None) -> ModelProvider:
-    """Factory que devuelve una instancia del proveedor.
-    Si no se proporcionan argumentos, carga la configuración por defecto.
-    """
+    """Factory que devuelve una instancia del proveedor."""
     selected_provider_type = provider_type
     selected_api_key_config = api_key_config
     selected_model_name = None
@@ -151,8 +149,8 @@ def get_model_provider(provider_type: str = None, api_key_config: dict = None) -
     instance = ProviderClass(api_key_config=selected_api_key_config)
     
     model_to_set = selected_model_name
-    if not model_to_set and selected_api_key_config.get("available_models"):
-        model_to_set = selected_api_key_config["available_models"][0]["name"]
+    if not model_to_set and selected_api_key_config.get("models"):
+        model_to_set = selected_api_key_config["models"][0]["name"]
     
     if model_to_set:
         instance.set_model(model_to_set)
@@ -166,7 +164,7 @@ def refresh_provider_models(provider_type: str, key_name: str):
         print(f"ADVERTENCIA: No se encontró el proveedor '{provider_type}'.")
         return
 
-    key_config = next((k for k in provider.get("api_key_configs", []) if k['name'] == key_name), None)
+    key_config = next((k for k in provider.get("api_keys", []) if k['name'] == key_name), None)
     if not key_config:
         print(f"ADVERTENCIA: No se encontró la config de API key '{key_name}'.")
         return

@@ -64,12 +64,27 @@ class MongoDBChatMemory:
         
         try:
             self.logger.info("Generando resumen de memoria...")
-            # Usar el nuevo método del proveedor
-            resumen = self.model_provider.generate_text(prompt_analisis)
+            # FIX: Usar generate_content que devuelve un dict, y extraer el texto.
+            respuesta_modelo = self.model_provider.generate_content(prompt_analisis)
+            
+            # La respuesta puede ser un string directo o un dict.
+            if isinstance(respuesta_modelo, dict):
+                # Extraer el contenido de texto. La clave puede variar.
+                # Buscamos en orden de probabilidad: 'text', 'content', 'summary', 'response'
+                resumen = respuesta_modelo.get('text', 
+                                     respuesta_modelo.get('content', 
+                                                respuesta_modelo.get('summary', 
+                                                           respuesta_modelo.get('response'))))
+                if not resumen:
+                    # Si no se encuentra una clave conocida, se convierte el dict a string.
+                    resumen = str(respuesta_modelo)
+            else:
+                resumen = str(respuesta_modelo)
+
             self.logger.debug(f"Resumen de memoria generado: {resumen}")
             return resumen
         except Exception as e:
-            self.logger.error(f"Error al generar resumen de memoria: {e}")
+            self.logger.error(f"Error al generar resumen de memoria: {e}", exc_info=True)
             return "Error al procesar la memoria."
 
     # ... (El resto de los métodos de la clase permanecen sin cambios)

@@ -8,60 +8,70 @@ class ProviderDBManager:
         self.collection = self.db[MONGODB_PROVIDERS_COLLECTION]
 
     def get_all_providers(self) -> list:
-        """Recupera todos los documentos de proveedores."""
-        return list(self.collection.find())
+        """Recupera la lista de proveedores del documento único."""
+        config_doc = self.collection.find_one()
+        return config_doc.get("providers", []) if config_doc else []
 
     def get_provider(self, provider_type: str) -> dict | None:
-        """Recupera un proveedor por su tipo."""
-        return self.collection.find_one({"provider_type": provider_type})
+        """Recupera un proveedor por su tipo desde el documento único."""
+        providers = self.get_all_providers()
+        return next((p for p in providers if p.get("provider_type") == provider_type), None)
 
     def add_api_key_config(self, provider_type: str, api_key_config: dict):
         """Añade una nueva configuración de API key a un proveedor."""
         return self.collection.update_one(
-            {"provider_type": provider_type},
-            {"$push": {"api_key_configs": api_key_config}},
-            upsert=True
+            {"providers.provider_type": provider_type},
+            {"$push": {"providers.$.api_keys": api_key_config}}
         )
 
     def update_api_key_config(self, provider_type: str, key_name: str, new_config: dict):
         """Actualiza una configuración de API key existente."""
         return self.collection.update_one(
-            {"provider_type": provider_type, "api_key_configs.name": key_name},
-            {"$set": {"api_key_configs.$": new_config}}
+            {"providers.provider_type": provider_type, "providers.api_keys.name": key_name},
+            {"$set": {"providers.$[provider].api_keys.$[key]": new_config}},
+            array_filters=[
+                {"provider.provider_type": provider_type},
+                {"key.name": key_name}
+            ]
         )
 
     def delete_api_key_config(self, provider_type: str, key_name: str):
         """Elimina una configuración de API key."""
         return self.collection.update_one(
-            {"provider_type": provider_type},
-            {"$pull": {"api_key_configs": {"name": key_name}}}
+            {"providers.provider_type": provider_type},
+            {"$pull": {"providers.$.api_keys": {"name": key_name}}}
         )
 
     def update_models_for_api_key(self, provider_type: str, key_name: str, models: list):
         """Actualiza la lista de modelos para una API key específica."""
         return self.collection.update_one(
-            {"provider_type": provider_type, "api_key_configs.name": key_name},
-            {"$set": {"api_key_configs.$.available_models": models}}
+            {"providers.provider_type": provider_type, "providers.api_keys.name": key_name},
+            {"$set": {"providers.$[provider].api_keys.$[key].models": models}},
+            array_filters=[
+                {"provider.provider_type": provider_type},
+                {"key.name": key_name}
+            ]
         )
 
     def set_last_used_model(self, provider_type: str, key_name: str, model_name: str):
         """Marca un modelo como el último usado, y desmarca todos los demás."""
-        # Desmarcar cualquier otro modelo que estuviera como último usado
-        self.collection.update_many(
-            {"api_key_configs.available_models.is_last_used": True},
-            {"$set": {"api_key_configs.$[].available_models.$[].is_last_used": False}}
+        # Desmarcar todos los modelos en toda la colección
+        self.collection.update_one(
+            {},
+            {"$set": {"providers.$[].api_keys.$[].models.$[].is_last_used": False}}
         )
         # Marcar el nuevo modelo como último usado
         return self.collection.update_one(
             {
-                "provider_type": provider_type,
-                "api_key_configs.name": key_name,
-                "api_key_configs.available_models.name": model_name
+                "providers.provider_type": provider_type,
+                "providers.api_keys.name": key_name,
+                "providers.api_keys.models.name": model_name
             },
-            {"$set": {"api_key_configs.$[key].available_models.$[model].is_last_used": True}},
+            {"$set": {"providers.$[p].api_keys.$[k].models.$[m].is_last_used": True}},
             array_filters=[
-                {"key.name": key_name},
-                {"model.name": model_name}
+                {"p.provider_type": provider_type},
+                {"k.name": key_name},
+                {"m.name": model_name}
             ]
         )
 
