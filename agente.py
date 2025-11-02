@@ -3,6 +3,7 @@ import json
 import logging
 import threading
 import pyautogui
+import re
 
 # Módulos de la aplicación
 import config
@@ -85,29 +86,80 @@ class Agente:
         self.parada_emergencia.set()
         self.logger.warning("¡PARADA DE EMERGENCIA ACTIVADA!")
 
+    def _limpiar_y_parsear_json(self, texto_respuesta: str) -> dict:
+        """
+        Limpia y parsea una cadena que se espera contenga JSON.
+        - Extrae el contenido de bloques de código markdown (```json ... ```).
+        - Intenta parsear el JSON.
+        - Devuelve un diccionario de acción nula si el parseo falla.
+        """
+        self.logger.debug(f"Limpiando texto para JSON: '{texto_respuesta}'")
+        
+        # Buscar el bloque de código JSON
+        match = re.search(r'```json\s*(\{.*?\})\s*```', texto_respuesta, re.DOTALL)
+        if match:
+            json_str = match.group(1)
+        else:
+            # Si no hay bloque de código, buscar el primer '{' y el último '}'
+            start = texto_respuesta.find('{')
+            end = texto_respuesta.rfind('}')
+            if start != -1 and end != -1 and start < end:
+                json_str = texto_respuesta[start:end+1]
+            else:
+                json_str = texto_respuesta
+
+        self.logger.debug(f"Cadena JSON extraída: '{json_str}'")
+        
+        try:
+            return json.loads(json_str)
+        except json.JSONDecodeError as e:
+            self.logger.error(f"Error al decodificar JSON: {e}. Contenido: '{json_str}'")
+            return {"accion": None, "razon": f"Error de decodificación JSON en la respuesta: {e}", "respuesta_original": json_str}
+
     def _call_model(self, prompt: str, image=None) -> dict:
         self.logger.info("Esperando el bloqueo de la API del modelo...")
         with model_api_lock:
             self.logger.info("Bloqueo adquirido. Enviando petición al modelo de IA...")
             try:
-                decision = self.model_provider.generate_content(prompt, image)
-                self.logger.debug(f"Respuesta del modelo: {decision}")
+                respuesta_bruta = self.model_provider.generate_content(prompt, image)
+                self.logger.debug(f"Respuesta BRUTA del modelo: {respuesta_bruta}")
+
+                texto_para_parsear = None
+                if isinstance(respuesta_bruta, dict):
+                    # Caso común: {'text': '...'} o similar
+                    if 'text' in respuesta_bruta and isinstance(respuesta_bruta['text'], str):
+                        texto_para_parsear = respuesta_bruta['text']
+                    else:
+                        # Si es un dict pero no tiene 'text', lo intentamos convertir a string
+                        texto_para_parsear = str(respuesta_bruta)
+                elif isinstance(respuesta_bruta, str):
+                    texto_para_parsear = respuesta_bruta
                 
-                # Asegurarse de que la decisión sea un diccionario
-                if not isinstance(decision, dict):
-                    # Si no es un dict, podría ser un string con JSON, o texto plano.
-                    # Intentamos cargarlo como JSON
-                    try:
-                        decision = json.loads(decision)
-                    except (json.JSONDecodeError, TypeError):
-                        # Si falla, lo envolvemos en un diccionario de acción nula
-                        self.logger.warning(f"La respuesta del modelo no fue un JSON válido: {decision}")
-                        return {"accion": None, "razon": "La respuesta del modelo no fue un JSON válido.", "respuesta_original": str(decision)}
+                if not texto_para_parsear:
+                    self.logger.error("La respuesta del modelo está vacía o en un formato inesperado.")
+                    return {"accion": None, "razon": "Respuesta vacía o inesperada del modelo.", "respuesta_original": str(respuesta_bruta)}
+
+                decision = self._limpiar_y_parsear_json(texto_para_parsear)
+                
+                if not decision.get("accion"):
+                     self.logger.warning(f"El JSON parseado no contiene una acción o falló el parseo. Respuesta original: {texto_para_parsear}")
+                     # Si el parseo falló, la razón ya está en 'decision'
+                     if "respuesta_original" not in decision:
+                         decision["respuesta_original"] = texto_para_parsear
 
                 return decision
+
             except Exception as e:
                 self.logger.error(f"ERROR al llamar al proveedor del modelo de IA: {e}", exc_info=True)
                 return {"accion": None, "razon": f"Error en la llamada a la API a través del proveedor: {e}"}
+
+    def _set_initial_objective(self, objetivo):
+        self.logger.info(f"Estableciendo objetivo inicial desde el historial: '{objetivo}'")
+        self.objetivo = objetivo
+        self.historial_acciones = []
+        self.resultado_accion_anterior = None
+        self.parada_emergencia.clear()
+        # No guardar en memoria, ya está ahí
 
     def establecer_objetivo(self, objetivo):
         self.logger.info(f"Llamada a establecer_objetivo con: '{objetivo}'")
@@ -199,8 +251,8 @@ RESPUESTA (ÚNICAMENTE JSON con la siguiente estructura obligatoria):
   "params": {{ "<nombre_param>": "<valor_param>" }}
 }}
 Ejemplos de acciones de comunicación:
-- Para responder verbalmente: {{"accion": "hablar", "params": {{"mensaje": "Aquí está la información solicitada."}}}}
-- Para finalizar una tarea con un mensaje: {{"accion": "finalizar", "params": {{"razon": "La tarea de buscar información ha sido completada."}}}}
+- Para responder verbalmente: {{'accion': 'hablar', 'params': {{'mensaje': 'Aquí está la información solicitada.'}}}}
+- Para finalizar una tarea con un mensaje: {{'accion': 'finalizar', 'params': {{'razon': 'La tarea de buscar información ha sido completada.'}}}}
 '''
         return prompt
 

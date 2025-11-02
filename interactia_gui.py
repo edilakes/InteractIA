@@ -11,6 +11,46 @@ from model_manager import (
 )
 from gui_model_manager import ProviderManagerWindow
 
+class ChatMessage(tk.Frame):
+    def __init__(self, parent, message, role, **kwargs):
+        super().__init__(parent, **kwargs)
+        self.message = message
+        self.role = role
+        self.parent = parent
+
+        self.configure(borderwidth=1, relief='raised', highlightbackground="black", highlightthickness=1)
+
+        if role == 'user':
+            self.configure(bg='#E0F7FA')
+            justify = 'right'
+            anchor = 'e'
+        else:
+            self.configure(bg='#F0F0F0')
+            justify = 'left'
+            anchor = 'w'
+
+        self.grid_columnconfigure(0, weight=1)
+
+        # Contenedor para el mensaje y el botón
+        container = tk.Frame(self, bg=self.cget('bg'))
+        container.grid(row=0, column=0, sticky='ew')
+        container.grid_columnconfigure(0, weight=1)
+
+        # Mensaje
+        self.message_label = tk.Label(container, text=message, justify=justify, bg=self.cget('bg'), anchor=anchor)
+        self.message_label.grid(row=0, column=0, padx=10, pady=5, sticky='ew')
+
+        # Botón de copiar
+        self.copy_button = ttk.Button(container, text="Copiar", width=6, command=self.copy_to_clipboard)
+        self.copy_button.grid(row=0, column=1, padx=(0, 5), pady=5, sticky='ne')
+
+    def copy_to_clipboard(self):
+        self.parent.clipboard_clear()
+        self.parent.clipboard_append(self.message)
+        self.parent.update() # Now it stays on the clipboard after the window is closed
+        self.copy_button.config(text="Copiado!")
+        self.after(1500, lambda: self.copy_button.config(text="Copiar"))
+
 class InteractIAGUI:
     def __init__(self, root, titulo="InteractIA - Agente Inteligente", id_objetivo=None):
         print("Initializing InteractIAGUI...")
@@ -30,10 +70,10 @@ class InteractIAGUI:
         self._agent_writing = False
         self._loading_config = True # Flag to prevent events during setup
         self._agent_thread = None
+        self.current_agent_message_widget = None
 
         self._create_menu()
         self._create_widgets()
-        self._configure_chat_tags()
         self.reload_providers_config(initial_load=True)
 
     def start_gui(self):
@@ -94,15 +134,22 @@ class InteractIAGUI:
         chat_area_frame.grid(row=1, column=0, sticky="nsew")
         chat_area_frame.rowconfigure(0, weight=1)
         chat_area_frame.columnconfigure(0, weight=1)
-        
-        self.chat_history_text = tk.Text(chat_area_frame, wrap="word", state='normal', font=('Arial', 10))
-        self.chat_history_text.grid(row=0, column=0, sticky="nsew")
-        self.chat_history_text.bind("<Key>", lambda e: "break")
-        
-        self.scrollbar = ttk.Scrollbar(chat_area_frame, orient=tk.VERTICAL, command=self.chat_history_text.yview)
-        self.scrollbar.grid(row=0, column=1, sticky="ns")
-        self.chat_history_text['yscrollcommand'] = self.scrollbar.set
-        
+
+        self.chat_canvas = tk.Canvas(chat_area_frame, highlightthickness=0)
+        self.chat_canvas.grid(row=0, column=0, sticky='nsew')
+        self.chat_canvas.bind("<Configure>", self._on_canvas_configure)
+
+        self.scrollbar = ttk.Scrollbar(chat_area_frame, orient=tk.VERTICAL, command=self.chat_canvas.yview)
+        self.scrollbar.grid(row=0, column=1, sticky='ns')
+        self.chat_canvas.configure(yscrollcommand=self.scrollbar.set)
+
+        self.chat_frame = tk.Frame(self.chat_canvas, bg='white')
+        self.chat_canvas.create_window((0, 0), window=self.chat_frame, anchor='nw', tags='self.chat_frame')
+
+        self.chat_frame.bind("<Configure>", self._on_frame_configure)
+        self.chat_canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+        self.chat_frame.bind("<Configure>", self._on_chat_frame_configure, add='+')
+
         self.loading_bar = ttk.Progressbar(chat_area_frame, mode='indeterminate')
         self.loading_bar.grid(row=1, column=0, columnspan=2, sticky="ew", pady=5)
         self.loading_bar.grid_remove()
@@ -125,6 +172,24 @@ class InteractIAGUI:
         
         self.stop_button = ttk.Button(input_frame, text="Detener", command=self._on_stop_clicked)
         self.stop_button.grid(row=0, column=3, padx=5)
+
+    def _on_frame_configure(self, event=None):
+        self.chat_canvas.configure(scrollregion=self.chat_canvas.bbox("all"))
+
+    def _on_canvas_configure(self, event):
+        self.chat_canvas.itemconfig('self.chat_frame', width=event.width)
+
+    def _on_chat_frame_configure(self, event):
+        chat_message_width = max(1, event.width - 150)
+        log_message_width = max(1, event.width - 20)
+        for child in self.chat_frame.winfo_children():
+            if isinstance(child, ChatMessage):
+                child.message_label.config(wraplength=chat_message_width)
+            elif isinstance(child, tk.Label):
+                child.config(wraplength=log_message_width)
+
+    def _on_mousewheel(self, event):
+        self.chat_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
 
     def _on_input_modified(self, event=None):
         num_lines = self.input_entry.count("1.0", "end", "displaylines")[0]
@@ -272,6 +337,28 @@ class InteractIAGUI:
                 callback_log=self.insert_log_message
             )
             self.insert_log_message("Agente listo.")
+
+            # Check for pending user objective from history
+            if self.agente.historial_conversacion:
+                ultimo_mensaje = self.agente.historial_conversacion[-1]
+                if ultimo_mensaje['rol'] == 'usuario':
+                    # Check if an agent response is the second to last message
+                    if len(self.agente.historial_conversacion) > 1:
+                        penultimo_mensaje = self.agente.historial_conversacion[-2]
+                        if penultimo_mensaje['rol'] == 'agente':
+                            # If the agent already responded, do nothing
+                            return
+
+                    objetivo_pendiente = ultimo_mensaje['contenido']
+                    self.insert_log_message(f"Objetivo pendiente encontrado: \"{objetivo_pendiente}\"")
+                    self.agente._set_initial_objective(objetivo_pendiente) # Call the new method
+                    
+                    self.loading_bar.grid()
+                    self.loading_bar.start(10)
+                    
+                    self._agent_thread = threading.Thread(target=self.agente.stream_run)
+                    self._agent_thread.start()
+
         except Exception as e:
             self.show_error_and_exit(f"Error al inicializar agente: {e}")
 
@@ -316,23 +403,30 @@ class InteractIAGUI:
 
         return "break"
 
-    def _configure_chat_tags(self):
-        self.chat_history_text.tag_configure('user', justify='right', background='#E0F7FA', relief='raised', borderwidth=1, lmargin1=60, lmargin2=60, spacing3=5)
-        self.chat_history_text.tag_configure('agent', justify='left', background='#F0F0F0', foreground='black', relief='raised', borderwidth=1, lmargin1=10, lmargin2=10, spacing3=5)
-        self.chat_history_text.tag_configure('log', foreground='gray', font=('Arial', 8))
-
     def insert_message(self, message, role):
         from datetime import datetime
         timestamp = datetime.now().strftime("%H:%M:%S")
-        self.chat_history_text.insert(tk.END, f"[{timestamp}] {message}\n\n", role)
-        self.chat_history_text.see(tk.END)
+        full_message = f"[{timestamp}] {message}"
+        
+        msg_widget = ChatMessage(self.chat_frame, full_message, role)
+        
+        if role == 'user':
+            msg_widget.pack(pady=(5,0), padx=(60,10), anchor='e', fill='x')
+        else: # agent or log
+            msg_widget.pack(pady=(5,0), padx=(10,60), anchor='w', fill='x')
+
+        self.root.update_idletasks()
+        self.chat_canvas.yview_moveto(1.0)
+        return msg_widget
 
     def insert_log_message(self, message):
         self.root.after(0, self._insert_log_message, message)
 
     def _insert_log_message(self, message):
-        self.chat_history_text.insert(tk.END, f"{message}\n", 'log')
-        self.chat_history_text.see(tk.END)
+        msg_widget = tk.Label(self.chat_frame, text=message, fg='gray', font=('Arial', 8), justify='left', anchor='w', bg='white')
+        msg_widget.pack(pady=(2,0), padx=10, anchor='w', fill='x')
+        self.root.update_idletasks()
+        self.chat_canvas.yview_moveto(1.0)
 
     def mostrar_mensaje_agente(self, token):
         self.root.after(0, self._insert_agent_token, token)
@@ -341,20 +435,22 @@ class InteractIAGUI:
         self.root.after(0, self._finalize_agent_response)
 
     def _insert_agent_token(self, token):
-        from datetime import datetime
         if not self._agent_writing:
-            timestamp = datetime.now().strftime("%H:%M:%S")
-            self.chat_history_text.insert(tk.END, f"Agente [{timestamp}]: ", 'agent')
+            self.current_agent_message_widget = self.insert_message("", 'agent')
             self._agent_writing = True
             self.loading_bar.stop()
             self.loading_bar.grid_remove()
-        self.chat_history_text.insert(tk.END, token, 'agent')
-        self.chat_history_text.see(tk.END)
+
+        current_text = self.current_agent_message_widget.message
+        new_text = current_text + token
+        self.current_agent_message_widget.message = new_text
+        self.current_agent_message_widget.message_label.config(text=new_text)
+        self.root.update_idletasks()
+        self.chat_canvas.yview_moveto(1.0)
 
     def _finalize_agent_response(self):
-        self.chat_history_text.insert(tk.END, "\n\n", 'agent')
-        self.chat_history_text.see(tk.END)
         self._agent_writing = False
+        self.current_agent_message_widget = None
         self.loading_bar.stop()
         self.loading_bar.grid_remove()
         self._agent_thread = None
