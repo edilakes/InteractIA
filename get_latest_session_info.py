@@ -22,18 +22,30 @@ LOG_FILE_PATH = "interactia_debug.log"
 # ---
 
 def get_latest_session_id_from_log(log_path):
-    """Lee el archivo de log desde el final para encontrar el último ID de sesión."""
+    """Lee el archivo de log desde el final para encontrar el último ID de sesión, manejando logs JSON."""
     try:
         with open(log_path, 'r', encoding='utf-8') as f:
             lines = f.readlines()
         
         # Buscar el ID de sesión desde la última línea hacia atrás
         for line in reversed(lines):
-            match = re.search(r'interactia-([a-zA-Z0-9]+)', line)
-            if match:
-                session_id = match.group(0)
-                print(f"Último ID de sesión encontrado: {session_id}")
-                return session_id
+            try:
+                log_entry = json.loads(line)
+                message = log_entry.get('message', '')
+                # También buscar en el campo 'module' o 'function' si es relevante
+                if "agente" in log_entry.get('module', '') or "agente" in log_entry.get('function', ''):
+                    match = re.search(r'interactia-([a-zA-Z0-9]+)', message)
+                    if match:
+                        session_id = match.group(0)
+                        print(f"Último ID de sesión encontrado: {session_id}")
+                        return session_id
+            except json.JSONDecodeError:
+                # Si no es JSON, intentar el método antiguo
+                match = re.search(r'interactia-([a-zA-Z0-9]+)', line)
+                if match:
+                    session_id = match.group(0)
+                    print(f"Último ID de sesión encontrado: {session_id}")
+                    return session_id
     except FileNotFoundError:
         print(f"Error: No se encontró el archivo de log en '{log_path}'")
     except Exception as e:
@@ -77,20 +89,21 @@ def get_chat_history(session_id):
         print(f"Ocurrió un error inesperado al obtener el chat: {e}")
 
 def get_session_logs(session_id, log_path):
-    """Filtra y muestra los logs para un ID de sesión específico."""
+    """Filtra y muestra los logs para un ID de sesión específico, manejando logs JSON."""
     print(f"\n--- Logs para la sesión: {session_id} ---")
     try:
         with open(log_path, 'r', encoding='utf-8') as f:
             for line in f:
-                if session_id in line:
-                    line = line.strip()
-                    if line.startswith('{'):
-                        try:
-                            log_json = json.loads(line)
-                            print(f"[{log_json.get('timestamp')}] [{log_json.get('level')}] [{log_json.get('module')}:{log_json.get('function')}:{log_json.get('line')}] {log_json.get('message')}")
-                        except json.JSONDecodeError:
-                            print(f"[RAW] {line}")
-                    else:
+                line = line.strip()
+                try:
+                    log_json = json.loads(line)
+                    message = log_json.get('message', '')
+                    # Check if session_id is in the message or if it's an agent's log for this session
+                    if session_id in message or (session_id in log_json.get('module', '') or session_id in log_json.get('function', '')):
+                        print(f"[{log_json.get('timestamp')}] [{log_json.get('level')}] [{log_json.get('module')}:{log_json.get('function')}:{log_json.get('line')}] {log_json.get('message')}")
+                except json.JSONDecodeError:
+                    # Fallback for non-JSON lines, though all InteractIA logs should be JSON now
+                    if session_id in line:
                         print(f"[RAW] {line}")
     except FileNotFoundError:
         print(f"Error: No se encontró el archivo de log en '{log_path}'")
