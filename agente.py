@@ -94,7 +94,7 @@ class Agente:
         f"""El error fue: {error_message}\n"""
         f"""Tu respuesta original fue:\n```\n{malformed_response}\n```\n"""
         f"""Por favor, corrige tu respuesta para que sea un JSON válido y se ajuste al siguiente esquema:\n"""
-        f"" F{EXPECTED_JSON_SCHEMA_DESCRIPTION}\n"""
+        f"""{EXPECTED_JSON_SCHEMA_DESCRIPTION}\n"""
         f"""Responde ÚNICAMENTE con el objeto JSON corregido, sin texto adicional ni explicaciones.\n"""
 
     def _parsear_respuesta_llm_con_correccion(self, raw_llm_response_text: str, max_retries: int = 3) -> dict:
@@ -146,7 +146,7 @@ class Agente:
                 return {"accion": "responder_chat", "argumentos": {"mensaje": f"Error interno: no pude procesar la decisión del modelo después de {max_retries} intentos. ({error_message})"}}
         
         # Esto solo se alcanzará si el bucle termina sin éxito y sin retornar en el último intento
-        return {"accion": "responder_chat", "argumentos": {"mensaje": "Error interno desconocido durante el parseo de la respuesta del modelo."}}
+        return {"accion": "responder_chat", "argumentos": {"mensaje": f"Error interno desconocido durante el parseo de la respuesta del modelo."}}
 
     def _query_llm(self, prompt: str) -> dict:
         self.logger.info("Enviando petición al modelo de IA...")
@@ -211,7 +211,7 @@ class Agente:
         self.logger.info(f"--- Iniciando ciclo para mensaje: '{user_message}' ---")
 
         # 1. Recopilar contexto
-        historial_raw = self.memoria._recuperar_historial_crudo(session_id=session_id)
+        historial_raw = self.memoria._recuperar_historial_crudo(session_key=session_id)
         historial_chat = self.memoria.convertir_historial_a_formato_simple(historial_raw)
         
         # 2. Construir el prompt
