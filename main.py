@@ -1,4 +1,5 @@
 from interactia_gui import InteractIAGUI
+from logger_config import setup_logging
 import tkinter as tk
 import sys
 import threading
@@ -15,6 +16,7 @@ def generar_id_aleatorio(longitud=6):
 
 def main():
     """Punto de entrada principal para la aplicación InteractIA."""
+    setup_logging() # Initialize logging at the very beginning
     parser = argparse.ArgumentParser(description="InteractIA - Agente de IA Autónomo")
     parser.add_argument("--supervisando-a", type=str, help="El ID de la instancia de InteractIA a supervisar.")
     # Añadir aquí futuros argumentos de línea de comandos
@@ -25,10 +27,31 @@ def main():
 
     # Si se proporciona un objetivo en la línea de comandos, ejecutar en modo CLI
     if objetivo_cli:
-        from agente import Agente
-        agente = Agente(callback_hablar=lambda msg: print(f"Agente: {msg}"))
-        agente.establecer_objetivo(objetivo_cli)
-        agente.stream_run()
+        from agente_v3 import AgenteV3
+        from model_manager import get_default_provider_config, get_model_provider
+
+        print("Ejecutando en modo CLI...")
+        try:
+            # Obtener la configuración del proveedor por defecto
+            provider_type, key_config, model_name = get_default_provider_config()
+            
+            # Obtener la instancia del proveedor del modelo
+            print(f"Cargando proveedor por defecto: {provider_type} con modelo {model_name}")
+            model_provider = get_model_provider(provider_type, key_config)
+            
+            # Instanciar el nuevo agente V2
+            agente = AgenteV3(
+                model_provider=model_provider,
+                model_name=model_name,
+                callback_hablar=lambda msg: print(f"\n[AGENTE]: {msg}\n")
+            )
+            
+            # Ejecutar el ciclo del agente
+            agente.run_cycle(user_message=objetivo_cli, session_id='cli_session')
+
+        except Exception as e:
+            print(f"Error al ejecutar el agente en modo CLI: {e}")
+
     else:
         # De lo contrario, iniciar la GUI
         id_instancia = generar_id_aleatorio()

@@ -17,6 +17,9 @@ MONGODB_DATABASE_NAME = "interactia_db"
 # Nombre de la colección para el historial de chat
 MONGODB_CHAT_COLLECTION = "chat_history"
 
+# Nombre de la colección para la base de conocimiento
+MONGODB_KB_COLLECTION = "knowledge_base"
+
 # Nombre de la colección para las oportunidades de aprendizaje descubiertas
 MONGODB_OPORTUNIDADES_COLLECTION = "oportunidades_aprendizaje"
 

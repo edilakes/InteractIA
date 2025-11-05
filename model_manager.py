@@ -25,6 +25,11 @@ class ModelProvider(abc.ABC):
         pass
 
     @abc.abstractmethod
+    def embed_content(self, text: str) -> list[float]:
+        """Genera un vector de embedding para un texto dado."""
+        pass
+
+    @abc.abstractmethod
     def refresh_available_models(self):
         pass
 
@@ -44,6 +49,8 @@ class GeminiProvider(ModelProvider):
         
         genai.configure(api_key=api_key)
         self.modelo = None
+        # TODO: Hacer que el modelo de embedding sea configurable
+        self.embedding_model = "models/embedding-001"
 
     def set_model(self, model_name: str):
         self.modelo = genai.GenerativeModel(model_name)
@@ -78,10 +85,20 @@ class GeminiProvider(ModelProvider):
             print(f"ERROR en GeminiProvider (generate_content): {e}")
             return {"error": str(e)}
 
+    def embed_content(self, text: str) -> list[float]:
+        """Genera un embedding para el texto usando el modelo de embedding de Gemini."""
+        try:
+            result = genai.embed_content(model=self.embedding_model, content=text)
+            return result['embedding']
+        except Exception as e:
+            print(f"ERROR en GeminiProvider (embed_content): {e}")
+            return None
+
     def refresh_available_models(self):
         print(f"Refrescando modelos para {self.api_key_config.get('name')}...")
         try:
-            current_model_names = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+            # Actualizado para incluir modelos de embedding
+            current_model_names = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods or 'embedContent' in m.supported_generation_methods]
             
             old_models = self.api_key_config.get("models", [])
             last_used_model = next((m["name"] for m in old_models if m.get("is_last_used")), None)
@@ -150,7 +167,10 @@ def get_model_provider(provider_type: str = None, api_key_config: dict = None) -
     
     model_to_set = selected_model_name
     if not model_to_set and selected_api_key_config.get("models"):
-        model_to_set = selected_api_key_config["models"][0]["name"]
+        # Prioritize non-embedding models for general use
+        generative_models = [m["name"] for m in selected_api_key_config["models"] if 'embed' not in m["name"]]
+        if generative_models:
+            model_to_set = generative_models[0]
     
     if model_to_set:
         instance.set_model(model_to_set)

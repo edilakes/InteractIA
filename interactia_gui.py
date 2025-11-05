@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import threading
 
-from agente import Agente
+from agente import Agente # MODIFICADO: Usar Agente
 from model_manager import (
     load_providers_from_db,
     get_model_provider,
@@ -327,37 +327,13 @@ class InteractIAGUI:
             )
             self.active_provider.set_model(self.selected_model)
 
+            # MODIFICADO: Instanciar Agente
             self.agente = Agente(
                 model_provider=self.active_provider,
                 model_name=self.selected_model,
-                id_ventana=self.titulo_ventana,
-                id_objetivo=self.id_objetivo,
-                callback_hablar=self.mostrar_mensaje_agente,
-                callback_finalizar=self.finalizar_respuesta_agente,
-                callback_log=self.insert_log_message
+                callback_hablar=self.mostrar_mensaje_agente
             )
             self.insert_log_message("Agente listo.")
-
-            # Check for pending user objective from history
-            if self.agente.historial_conversacion:
-                ultimo_mensaje = self.agente.historial_conversacion[-1]
-                if ultimo_mensaje['rol'] == 'usuario':
-                    # Check if an agent response is the second to last message
-                    if len(self.agente.historial_conversacion) > 1:
-                        penultimo_mensaje = self.agente.historial_conversacion[-2]
-                        if penultimo_mensaje['rol'] == 'agente':
-                            # If the agent already responded, do nothing
-                            return
-
-                    objetivo_pendiente = ultimo_mensaje['contenido']
-                    self.insert_log_message(f"Objetivo pendiente encontrado: \"{objetivo_pendiente}\"")
-                    self.agente._set_initial_objective(objetivo_pendiente) # Call the new method
-                    
-                    self.loading_bar.grid()
-                    self.loading_bar.start(10)
-                    
-                    self._agent_thread = threading.Thread(target=self.agente.stream_run)
-                    self._agent_thread.start()
 
         except Exception as e:
             self.show_error_and_exit(f"Error al inicializar agente: {e}")
@@ -371,14 +347,25 @@ class InteractIAGUI:
 
     def exit_application(self):
         if self._agent_thread and self._agent_thread.is_alive():
-            self.agente.detener_proceso_emergencia()
-            self._agent_thread.join(timeout=2) # Esperar un poco a que el hilo termine
+            self._on_stop_clicked() # Intentar detener el agente
+            self._agent_thread.join(timeout=2)
         self.root.destroy()
 
     def _on_stop_clicked(self):
-        if self.agente:
-            self.agente.detener_proceso_emergencia()
-            self.insert_log_message("Solicitud de parada de emergencia enviada.")
+        # MODIFICADO: La V2 no tiene parada de emergencia aún.
+        self.insert_log_message("Función 'Detener' no implementada en V2.")
+        # if self.agente:
+        #     self.agente.detener_proceso_emergencia()
+        #     self.insert_log_message("Solicitud de parada de emergencia enviada.")
+
+    def _run_agent_cycle_threaded(self, command):
+        """Wrapper para ejecutar el ciclo del agente en un hilo y manejar el fin."""
+        try:
+            self.agente.run_cycle(user_message=command, session_id=self.titulo_ventana)
+        except Exception as e:
+            self.insert_log_message(f"Error en el ciclo del agente: {e}")
+        finally:
+            self.finalizar_respuesta_agente()
 
     def process_command(self, event=None):
         if event and event.state & 1:
@@ -389,7 +376,7 @@ class InteractIAGUI:
             return "break"
 
         if self._agent_thread and self._agent_thread.is_alive():
-            self.insert_log_message("El agente ya está procesando una tarea. Usa 'Detener' o espera a que termine.")
+            self.insert_log_message("El agente ya está procesando una tarea. Espera a que termine.")
             return "break"
             
         self.insert_message(command, 'user')
@@ -397,8 +384,8 @@ class InteractIAGUI:
         self.loading_bar.grid()
         self.loading_bar.start(10)
         
-        self.agente.establecer_objetivo(command)
-        self._agent_thread = threading.Thread(target=self.agente.stream_run)
+        # MODIFICADO: Usar el nuevo método de ciclo en un hilo
+        self._agent_thread = threading.Thread(target=self._run_agent_cycle_threaded, args=(command,))
         self._agent_thread.start()
 
         return "break"

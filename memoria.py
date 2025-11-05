@@ -1,18 +1,17 @@
 import pymongo
 from config import (
-    MONGO_URI, MONGODB_DATABASE_NAME, MONGODB_CHAT_COLLECTION, 
-    MONGODB_OPORTUNIDADES_COLLECTION, MONGODB_SESIONES_ANALIZADAS_COLLECTION,
+    MONGO_URI, MONGODB_DATABASE_NAME, MONGODB_CHAT_COLLECTION, MONGODB_KB_COLLECTION,
     CHAT_HISTORY_LENGTH
 )
 import datetime
 from datetime import timezone
 import logging
-from model_manager import ModelProvider # Importar la clase base
+from model_manager import get_model_provider, ModelProvider
 
 class MongoDBChatMemory:
     def __init__(self, model_provider: ModelProvider = None):
         self.logger = logging.getLogger("InteractIA")
-        self.model_provider = model_provider # Usar el proveedor genérico
+        self.model_provider = model_provider
         self.client = None
         self.db = None
         self.operativo = False
@@ -21,14 +20,12 @@ class MongoDBChatMemory:
             if not MONGO_URI or "SU_CADENA_DE_CONEXION" in MONGO_URI:
                 raise ValueError("La URI de MongoDB no está configurada.")
 
-            self.client = pymongo.MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
+            self.client = pymongo.MongoClient(MONGO_URI)
             self.client.admin.command('ping')
             self.db = self.client[MONGODB_DATABASE_NAME]
             
             self.collection_chats = self.db[MONGODB_CHAT_COLLECTION]
-            self.collection_oportunidades = self.db[MONGODB_OPORTUNIDADES_COLLECTION]
-            self.collection_sesiones_analizadas = self.db[MONGODB_SESIONES_ANALIZADAS_COLLECTION]
-            self.collection_estado = self.db["estado_agentes"]
+            self.kb_collection = self.db[MONGODB_KB_COLLECTION]
             
             self.operativo = True
             self.logger.info("Memoria conectada a MongoDB.")
@@ -64,20 +61,10 @@ class MongoDBChatMemory:
         
         try:
             self.logger.info("Generando resumen de memoria...")
-            # FIX: Usar generate_content que devuelve un dict, y extraer el texto.
             respuesta_modelo = self.model_provider.generate_content(prompt_analisis)
             
-            # La respuesta puede ser un string directo o un dict.
             if isinstance(respuesta_modelo, dict):
-                # Extraer el contenido de texto. La clave puede variar.
-                # Buscamos en orden de probabilidad: 'text', 'content', 'summary', 'response'
-                resumen = respuesta_modelo.get('text', 
-                                     respuesta_modelo.get('content', 
-                                                respuesta_modelo.get('summary', 
-                                                           respuesta_modelo.get('response'))))
-                if not resumen:
-                    # Si no se encuentra una clave conocida, se convierte el dict a string.
-                    resumen = str(respuesta_modelo)
+                resumen = respuesta_modelo.get('text', str(respuesta_modelo))
             else:
                 resumen = str(respuesta_modelo)
 
@@ -87,7 +74,66 @@ class MongoDBChatMemory:
             self.logger.error(f"Error al generar resumen de memoria: {e}", exc_info=True)
             return "Error al procesar la memoria."
 
-    # ... (El resto de los métodos de la clase permanecen sin cambios)
+    def get_chat_history(self, session_key: str, limit: int = 50) -> list:
+        self.logger.info(f"Recuperando historial de chat para la sesión {session_key} (límite: {limit}).")
+        return self._recuperar_historial_crudo(session_key, limit)
+
+    def query_base_conocimiento(self, query: str, top_k: int = 3) -> str:
+        """
+        Realiza una búsqueda semántica en la base de conocimiento.
+        """
+        if not self.operativo:
+            return "Error: La memoria no está operativa."
+        
+        if not self.model_provider:
+            # Si no se pasó un proveedor, obtenemos el por defecto
+            try:
+                self.model_provider = get_model_provider()
+            except Exception as e:
+                self.logger.error(f"Error al obtener el proveedor de modelos para la KB: {e}")
+                return "Error: No se pudo inicializar el proveedor de modelos para la KB."
+
+        self.logger.info(f"Realizando búsqueda en la KB con la consulta: '{query}'")
+        try:
+            # 1. Generar el embedding para la consulta del usuario
+            query_embedding = self.model_provider.embed_content(query)
+            if not query_embedding:
+                return "Error: No se pudo generar el embedding para la consulta."
+
+            # 2. Construir y ejecutar el pipeline de búsqueda vectorial
+            pipeline = [
+                {
+                    "$vectorSearch": {
+                        "index": "vector_index",
+                        "path": "embedding",
+                        "queryVector": query_embedding,
+                        "numCandidates": 10,
+                        "limit": top_k
+                    }
+                },
+                {
+                    "$project": {
+                        "_id": 0,
+                        "text": 1,
+                        "score": {"$meta": "vectorSearchScore"}
+                    }
+                }
+            ]
+
+            results = list(self.kb_collection.aggregate(pipeline))
+
+            if not results:
+                return "No se encontraron resultados relevantes en la base de conocimiento."
+
+            # 3. Formatear y devolver los resultados
+            contexto = "\n\n---\n".join([res['text'] for res in results])
+            self.logger.info(f"Búsqueda en KB completada. Se encontraron {len(results)} resultados.")
+            return f"Aquí hay algunos fragmentos de la documentación que podrían ser relevantes:\n\n{contexto}"
+
+        except Exception as e:
+            self.logger.error(f"Error durante la búsqueda en la base de conocimiento: {e}", exc_info=True)
+            return "Error al consultar la base de conocimiento."
+
     def guardar_mensaje(self, session_key: str, role: str, content: dict):
         if not self.operativo: return None
         documento = {
@@ -112,25 +158,3 @@ class MongoDBChatMemory:
         except Exception as e:
             self.logger.error(f"Error al recuperar historial: {e}")
             return []
-
-    def convertir_historial_a_formato_simple(self, historial_complejo: list) -> list:
-        historial_simple = []
-        for msg in historial_complejo:
-            texto_contenido = msg.get('content', {}).get('texto', '')
-            historial_simple.append({
-                'rol': msg.get('role'),
-                'contenido': texto_contenido
-            })
-        return historial_simple
-
-    def publicar_estado_agente(self, session_key: str, estado_data: dict):
-        if not self.operativo: return
-        try:
-            estado_data['timestamp'] = datetime.datetime.now(timezone.utc)
-            self.collection_estado.update_one(
-                {'_id': session_key},
-                {'$set': estado_data},
-                upsert=True
-            )
-        except Exception as e:
-            self.logger.error(f"Error al publicar estado del agente {session_key}: {e}")
