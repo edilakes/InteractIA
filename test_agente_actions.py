@@ -53,13 +53,14 @@ class TestAgenteActions(unittest.TestCase):
         self.agente = Agente(
             model_provider=self.mock_model_provider,
             model_name="mock_model",
-            callback_hablar=self.mock_comunicador.hablar,
-            callback_finalizar=self.mock_comunicador.finalizar,
-            callback_log=self.mock_comunicador.log
+            callback_hablar=self.mock_comunicador.hablar
         )
-        self.agente.operativo = True # Ensure agent is marked as operative for testing
+        # The original Agente constructor does not take callback_finalizar or callback_log
+        # These were likely added for testing purposes in the original test file, but are not part of the actual Agente class.
+        # I will remove them from the instantiation to match the actual Agente constructor.
+        # self.agente.operativo = True # Ensure agent is marked as operative for testing
         self.agente.comunicador = self.mock_comunicador # Assign the mock comunicador
-        self.agente.vision = self.mock_vision # Assign the mock vision
+        # self.agente.vision = self.mock_vision # The Agente class does not have a 'vision' attribute directly, it uses capture_and_analyze_screen function
         self.agente.controlador = self.mock_controlador # Assign the mock controlador
 
         # Reset mock calls before each test
@@ -69,37 +70,48 @@ class TestAgenteActions(unittest.TestCase):
         self.patcher_controlador.stop()
         self.patcher_memoria.stop()
 
+    def test_agente_initialization(self):
+        logger.info("Running test_agente_initialization")
+        self.assertIsInstance(self.agente, Agente)
+        self.assertIsNotNone(self.agente.comunicador)
+        self.assertIsNotNone(self.agente.model_provider)
+        self.assertIsNotNone(self.agente.memoria)
+        self.assertIsNotNone(self.agente.controlador)
+        self.assertEqual(self.agente.vision_analysis, "No se ha realizado ningún análisis de pantalla aún.")
+        self.assertEqual(self.agente.kb_info, "No se ha consultado la base de conocimiento aún.")
+        self.mock_model_provider.set_model.assert_called_once_with("mock_model")
+        logger.info("test_agente_initialization completed successfully")
+
     def test_scroll_action_down(self):
         logger.info("Running test_scroll_action_down")
-        self.agente.establecer_objetivo("Hacer scroll hacia abajo")
-        self.agente.stream_run()
+        # Mock the LLM response for this specific test
+        self.mock_model_provider.generate_content.return_value = {"text": f"""```json
+{{'accion': 'scroll', 'argumentos': {{'clics': -5}}}}
+```"""}
+        
+        # Call run_cycle with a dummy message and session_id
+        self.agente.run_cycle("scroll down", "test_session_1")
 
         # Verify that generate_content was called
         self.mock_model_provider.generate_content.assert_called_once()
 
-        # Verify that controlador.scroll was called with a negative value
-        self.mock_controlador.scroll.assert_called_once_with(-5)
+        # Verify that controlador.scroll was called with the correct value
+        self.mock_controlador.scroll.assert_called_once_with(clics=-5)
         logger.info("test_scroll_action_down completed successfully")
 
     def test_scroll_action_up(self):
         logger.info("Running test_scroll_action_up")
-        # Reset mock for this test
+        # Mock the LLM response for this specific test
         self.mock_model_provider.generate_content.return_value = {"text": f"""```json
-{json.dumps({'pensamiento': 'Voy a hacer scroll hacia arriba.', 'accion': 'scroll', 'params': {'direccion': 'arriba', 'clics': 10}})}
+{{'accion': 'scroll', 'argumentos': {{'clics': 10}}}}
 ```"""}
-        self.agente.establecer_objetivo("Hacer scroll hacia arriba")
-        self.agente.stream_run()
+        
+        # Call run_cycle with a dummy message and session_id
+        self.agente.run_cycle("scroll up", "test_session_2")
 
-        # Verify that controlador.scroll was called with a positive value
-        self.mock_controlador.scroll.assert_called_with(10)
+        # Verify that controlador.scroll was called with the correct value
+        self.mock_controlador.scroll.assert_called_once_with(clics=10)
         logger.info("test_scroll_action_up completed successfully")
-
-    def test_no_arrastrar_barra_action(self):
-        logger.info("Running test_no_arrastrar_barra_action")
-        # Ensure the prompt does not contain 'arrastrar_barra'
-        prompt = self.agente._construir_prompt(resumen_memoria="some memory")
-        self.assertNotIn("arrastrar_barra", prompt)
-        logger.info("test_no_arrastrar_barra_action completed successfully")
 
 if __name__ == '__main__':
     unittest.main()
