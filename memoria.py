@@ -33,6 +33,15 @@ class MongoDBChatMemory:
         except Exception as e:
             self.logger.error(f"ERROR al inicializar MongoDBChatMemory: {e}")
 
+    def convertir_historial_a_formato_simple(self, historial_raw: list) -> list:
+        historial_simple = []
+        for msg in historial_raw:
+            rol = msg.get('role')
+            contenido = msg.get('content', {}).get('texto', '')
+            if rol and contenido:
+                historial_simple.append({'rol': rol, 'contenido': contenido})
+        return historial_simple
+
     def resumir_y_consultar(self, session_key: str, pregunta_concreta: str = None) -> str:
         if not self.operativo or not self.model_provider:
             self.logger.warning("La memoria no puede resumir: no operativa o sin proveedor de modelo.")
