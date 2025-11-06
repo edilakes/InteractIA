@@ -62,7 +62,14 @@ class Controlador:
         self.logger.info(f"Presionando tecla: '{tecla}'.")
         if '+' in tecla:
             partes = tecla.split('+')
-            pyautogui.hotkey(*partes)
+            # Press all keys down
+            for p in partes:
+                self.mantener_tecla(p)
+            # Wait a very short moment to ensure simultaneous press is registered
+            time.sleep(0.1)
+            # Release all keys
+            for p in partes:
+                self.soltar_tecla(p)
         else:
             pyautogui.press(tecla)
 

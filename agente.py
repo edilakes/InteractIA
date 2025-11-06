@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+import ast
 
 from comunicador import Comunicador
 from memoria import MongoDBChatMemory
@@ -52,12 +53,12 @@ ACCIONES DISPONIBLES:
 - `buscar_en_google(termino_busqueda)`: Realiza una búsqueda en Google.
 
 **Acciones Internas:**
-- `responder_chat(mensaje)`: Envía un mensaje al usuario.
+- `responder_chat(mensaje)`: Envía un mensaje al usuario. **Úsala cuando la tarea esté completamente terminada o necesites una aclaración del usuario.**
 - `analizar_pantalla()`: Realiza un análisis del entorno visual y actualiza el contexto.
 - `consultar_base_conocimiento(termino_busqueda)`: Busca en la base de conocimiento y actualiza el contexto.
-- `finalizar_tarea(mensaje_final)`: Indica que la tarea ha sido completada.
+- `finalizar_tarea(mensaje_final)`: Indica que la tarea ha sido completada. **Úsala solo cuando la tarea del usuario esté 100% resuelta y no haya más pasos pendientes.**
 
-Elige la acción más lógica para avanzar hacia la solución de la tarea del usuario.
+Elige la acción más lógica para avanzar hacia la solución de la tarea del usuario. Si la tarea requiere múltiples pasos, elige la siguiente acción necesaria. No finalices la tarea prematuramente.
 """
 
 # Descripción del esquema JSON esperado para la auto-corrección del LLM
@@ -108,30 +109,57 @@ class Agente:
             if match:
                 json_str = match.group(1)
             else:
+                # Intentar encontrar el JSON más externo si no hay bloque markdown
                 start = json_str.find('{')
                 end = json_str.rfind('}')
                 if start != -1 and end != -1 and start < end:
                     json_str = json_str[start:end+1]
                 # Si no se encuentra un bloque JSON claro, se asume que toda la respuesta es el JSON
-
-            # Reemplazar comillas simples por dobles (heurística)
-            json_str = json_str.replace("'", '"')
             
-            self.logger.debug(f"Contenido de json_str antes de json.loads: {json_str}")
+            parsed_json = None
+            error_message = ""
+
+            # Intento 1: Parsear como JSON estándar
             try:
                 parsed_json = json.loads(json_str)
-                # Aquí podríamos añadir una validación de esquema más estricta si fuera necesario
-                # Por ahora, solo verificamos que sea un diccionario con 'accion' y 'argumentos'
+            except json.JSONDecodeError as e:
+                error_message = f"Error al decodificar JSON estándar: {e}"
+                self.logger.debug(f"{error_message}. Contenido: '{json_str}'")
+                
+                # Intento 2: Si falla, intentar parsear como literal de Python y luego convertir a JSON
+                try:
+                    # para que ast.literal_eval lo interprete correctamente
+                    # y luego json.dumps lo vuelva a escapar si es necesario.
+                    # Esto es crucial para manejar las respuestas del LLM que a veces usan \n
+                    cleaned_json_str = json_str.replace('\\n', '\n')
+                    python_literal = ast.literal_eval(cleaned_json_str)
+                    # Convertir el literal de Python a una cadena JSON válida
+                    parsed_json = json.loads(json.dumps(python_literal))
+                    self.logger.debug("Parseado exitoso como literal de Python y convertido a JSON.")
+                except (SyntaxError, ValueError, TypeError) as e_literal:
+                    error_message = f"Error al decodificar como literal de Python: {e_literal}"
+                    self.logger.debug(f"{error_message}. Contenido: '{json_str}'")
+                    
+                    # Intento 3: Heurística de reemplazar comillas simples por dobles y reintentar json.loads
+                    try:
+                        # Solo aplicar esta heurística si los intentos anteriores fallaron
+                        json_str_fixed_quotes = json_str.replace("'", '"')
+                        parsed_json = json.loads(json.dumps(json_str_fixed_quotes))
+                        self.logger.debug("Parseado exitoso con reemplazo de comillas simples.")
+                    except json.JSONDecodeError as e_final:
+                        error_message = f"Error final al decodificar JSON con comillas corregidas: {e_final}"
+                        self.logger.warning(f"{error_message}. Contenido: '{json_str_fixed_quotes}'")
+
+            if parsed_json:
+                # Validar el esquema básico
                 if isinstance(parsed_json, dict) and "accion" in parsed_json and "argumentos" in parsed_json:
                     self.logger.info(f"JSON parseado y validado exitosamente en intento {retry_count + 1}.")
                     return parsed_json
                 else:
                     error_message = "El JSON no contiene las claves 'accion' y 'argumentos' o no es un diccionario válido."
                     self.logger.warning(f"Validación de esquema fallida: {error_message}")
-            except json.JSONDecodeError as e:
-                error_message = f"Error al decodificar JSON: {e}"
-                self.logger.warning(f"{error_message}. Contenido: '{json_str}'")
             
+            # Si llegamos aquí, el parseo o la validación fallaron
             if retry_count < max_retries - 1:
                 self.logger.info(f"Intentando auto-corrección del LLM (intento {retry_count + 1})...")
                 correction_prompt = self._generar_prompt_correccion(current_response_text, error_message)
@@ -207,7 +235,7 @@ class Agente:
             
         return None # Indica que no es una acción compuesta conocida
 
-    def run_cycle(self, user_message: str, session_id: str):
+    def _run_single_cycle(self, user_message: str, session_id: str) -> str:
         self.logger.info(f"--- Iniciando ciclo para mensaje: '{user_message}' ---")
 
         # 1. Recopilar contexto
@@ -268,6 +296,39 @@ class Agente:
         self.memoria.guardar_mensaje(session_id, 'agente', {'accion': accion, 'argumentos': argumentos, 'resultado': resultado})
 
         self.logger.info("--- Fin del ciclo ---")
+        return accion # Return the action taken
+
+    def execute_task(self, initial_user_message: str, session_id: str):
+        current_message = initial_user_message
+        task_completed = False
+        max_task_cycles = 10 # Prevent infinite loops
+        cycle_count = 0
+
+        while not task_completed and cycle_count < max_task_cycles:
+            cycle_count += 1
+            self.logger.info(f"--- Ejecutando ciclo de tarea {cycle_count}/{max_task_cycles} ---")
+            
+            # Execute a single cycle of the agent
+            accion_ejecutada = self._run_single_cycle(current_message, session_id)
+
+            # Determine if the task is completed based on the action executed
+            if accion_ejecutada in ["responder_chat", "finalizar_tarea"]:
+                task_completed = True
+                self.logger.info(f"Tarea finalizada por acción: {accion_ejecutada}")
+            else:
+                # For multi-step tasks, the agent needs to decide the next step.
+                # The 'current_message' for the next cycle should reflect the ongoing task.
+                # For now, we'll keep it as the initial message, but this might need refinement
+                # if the LLM needs to be prompted with updated context for the *next* step.
+                # A more advanced approach would be to have the LLM generate the 'next_step_message'.
+                self.logger.info(f"La tarea continúa. Acción ejecutada: {accion_ejecutada}")
+                # Optionally, update current_message based on the result of the last action
+                # For now, we rely on the LLM's ability to use chat history and screen analysis.
+
+        if not task_completed:
+            self.logger.warning(f"La tarea no se completó después de {max_task_cycles} ciclos.")
+            self.comunicador.hablar(f"No pude completar la tarea después de {max_task_cycles} intentos. Por favor, intenta de nuevo o sé más específico.")
+
 
 if __name__ == '__main__':
     print("Este es el nuevo agente. No contiene un bloque de prueba principal.")
