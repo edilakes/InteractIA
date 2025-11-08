@@ -8,6 +8,8 @@ import string
 import argparse
 
 from provider_db_manager import provider_db_manager # Import the global instance
+from agente import Agente
+from model_manager import get_default_provider_config, get_model_provider
 
 def generar_id_aleatorio(longitud=6):
     """Genera un ID alfanumérico aleatorio."""
@@ -27,9 +29,6 @@ def main():
 
     # Si se proporciona un objetivo en la línea de comandos, ejecutar en modo CLI
     if objetivo_cli:
-        from agente_v3 import AgenteV3
-        from model_manager import get_default_provider_config, get_model_provider
-
         print("Ejecutando en modo CLI...")
         try:
             # Obtener la configuración del proveedor por defecto
@@ -40,14 +39,14 @@ def main():
             model_provider = get_model_provider(provider_type, key_config)
             
             # Instanciar el nuevo agente V2
-            agente = AgenteV3(
+            agente = Agente(
                 model_provider=model_provider,
                 model_name=model_name,
                 callback_hablar=lambda msg: print(f"\n[AGENTE]: {msg}\n")
             )
             
             # Ejecutar el ciclo del agente
-            agente.run_cycle(user_message=objetivo_cli, session_id='cli_session')
+            agente.execute_task(initial_user_message=objetivo_cli, session_id='cli_session')
 
         except Exception as e:
             print(f"Error al ejecutar el agente en modo CLI: {e}")

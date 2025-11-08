@@ -81,3 +81,26 @@ class ProviderDBManager:
 
 # Global instance for easy access
 provider_db_manager = ProviderDBManager()
+
+def load_providers_from_db():
+    """Recupera la lista completa de proveedores y sus datos."""
+    return provider_db_manager.get_all_providers()
+
+def get_default_provider_config():
+    """
+    Encuentra y devuelve la configuración del proveedor, clave y modelo marcados como
+    últimos usados en la base de datos.
+    """
+    providers = provider_db_manager.get_all_providers()
+    for provider in providers:
+        for key_config in provider.get("api_keys", []):
+            for model in key_config.get("models", []):
+                if model.get("is_last_used"):
+                    # Retornar la configuración completa necesaria
+                    return provider["provider_type"], key_config, model["name"]
+    # Si no se encuentra ninguno, lanzar un error o devolver None
+    raise RuntimeError("No se ha encontrado un modelo por defecto (is_last_used=True) en la configuración.")
+
+def update_last_used_model(provider_type: str, key_name: str, model_name: str):
+    """Marca un modelo como el último usado."""
+    return provider_db_manager.set_last_used_model(provider_type, key_name, model_name)

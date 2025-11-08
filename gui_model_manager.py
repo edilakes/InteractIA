@@ -2,29 +2,9 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import threading
 import os
+from dotenv import set_key, get_key
 from model_manager import refresh_provider_models, load_providers_from_db, update_last_used_model, PROVIDER_MAP
 from provider_db_manager import provider_db_manager
-
-def _add_env_variable_to_file(variable_name):
-    """
-    Añade una variable al archivo .env si no existe.
-    Crea el archivo si no existe.
-    """
-    env_path = ".env"
-    line_to_add = f'\n{variable_name}=""'
-    try:
-        if os.path.exists(env_path):
-            with open(env_path, 'r') as f:
-                if any(line.strip().startswith(f'{variable_name}=') for line in f):
-                    return  # Ya existe
-        
-        with open(env_path, 'a') as f:
-            f.write(line_to_add)
-            
-    except IOError as e:
-        messagebox.showwarning("Error de Archivo",
-                               f"No se pudo escribir en el archivo .env: {e}\n"
-                               "Por favor, añade la variable manualmente.")
 
 class ApiKeyEditDialog(tk.Toplevel):
     """Diálogo para añadir o editar una configuración de API key."""
@@ -34,17 +14,31 @@ class ApiKeyEditDialog(tk.Toplevel):
         self.title(f"Clave de API para {provider_type}")
         self.result = None
         self.key_data = key_data or {}
+        self.env_path = ".env"
 
         frame = ttk.Frame(self, padding="10")
         frame.grid(row=0, column=0, sticky="nsew")
+        frame.columnconfigure(1, weight=1)
 
+        # Nombre de la variable de entorno
         ttk.Label(frame, text="Nombre de la Variable de Entorno:").grid(row=0, column=0, sticky="w", pady=2)
         self.name_entry = ttk.Entry(frame, width=40)
         self.name_entry.grid(row=0, column=1, sticky="ew")
         self.name_entry.insert(0, self.key_data.get("name", ""))
 
+        # Valor de la API Key
+        ttk.Label(frame, text="Valor de la API Key:").grid(row=1, column=0, sticky="w", pady=2)
+        self.api_key_entry = ttk.Entry(frame, width=40, show="*")
+        self.api_key_entry.grid(row=1, column=1, sticky="ew")
+
+        # Si estamos editando, cargamos el valor actual
+        if self.key_data.get("api_key_env_name"):
+            key_value = get_key(self.env_path, self.key_data["api_key_env_name"])
+            if key_value:
+                self.api_key_entry.insert(0, key_value)
+
         button_frame = ttk.Frame(frame)
-        button_frame.grid(row=1, column=0, columnspan=2, pady=(10, 0))
+        button_frame.grid(row=2, column=0, columnspan=2, pady=(10, 0))
         ttk.Button(button_frame, text="Guardar", command=self.on_save).pack(side="left", padx=5)
         ttk.Button(button_frame, text="Cancelar", command=self.destroy).pack(side="left", padx=5)
 
@@ -53,18 +47,34 @@ class ApiKeyEditDialog(tk.Toplevel):
 
     def on_save(self):
         name = self.name_entry.get().strip()
-        api_key_env_name = name
+        api_key_value = self.api_key_entry.get().strip()
+        api_key_env_name = name  # Asumimos que el nombre es la variable de entorno
 
         if not name:
-            messagebox.showerror("Error", "El campo es obligatorio.", parent=self)
+            messagebox.showerror("Error", "El nombre de la variable es obligatorio.", parent=self)
+            return
+        
+        if not api_key_value:
+            messagebox.showerror("Error", "El valor de la API key es obligatorio.", parent=self)
             return
 
-        _add_env_variable_to_file(api_key_env_name)
+        try:
+            # Guardar la clave en el archivo .env
+            set_key(self.env_path, api_key_env_name, api_key_value)
+            
+            # Actualizar el valor en el entorno de la sesión actual
+            os.environ[api_key_env_name] = api_key_value
+            
+            messagebox.showinfo("Éxito", f"La clave '{api_key_env_name}' ha sido guardada.", parent=self)
+
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo escribir en el archivo .env: {e}", parent=self)
+            return
 
         self.result = self.key_data.copy()
         self.result.update({"name": name, "api_key_env_name": api_key_env_name})
-        if "available_models" not in self.result:
-            self.result["available_models"] = []
+        if "models" not in self.result:
+            self.result["models"] = []
         self.destroy()
 
 class ProviderManagerWindow(tk.Toplevel):
