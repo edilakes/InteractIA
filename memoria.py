@@ -26,6 +26,7 @@ class MongoDBChatMemory:
             
             self.collection_chats = self.db[MONGODB_CHAT_COLLECTION]
             self.kb_collection = self.db[MONGODB_KB_COLLECTION]
+            self.skills_collection = self.db["skills_collection"] # Nueva colección para habilidades/demostraciones
             
             self.operativo = True
             self.logger.info("Memoria conectada a MongoDB.")
@@ -153,6 +154,80 @@ class MongoDBChatMemory:
             return self.collection_chats.insert_one(documento).inserted_id
         except Exception as e:
             self.logger.error(f"Error al guardar mensaje: {e}")
+            return None
+
+    def save_demonstration(self, task_description: str, demonstration_steps: list):
+        """
+        Guarda una demostración de una tarea en la colección de habilidades.
+        """
+        if not self.operativo or not self.model_provider:
+            self.logger.warning("La memoria no puede guardar demostraciones: no operativa o sin proveedor de modelo.")
+            return None
+
+        self.logger.info(f"Guardando demostración para la tarea: '{task_description}'")
+        try:
+            task_embedding = self.model_provider.embed_content(task_description)
+            if not task_embedding:
+                self.logger.error("No se pudo generar el embedding para la descripción de la tarea.")
+                return None
+
+            document = {
+                "task_description": task_description,
+                "embedding": task_embedding,
+                "demonstration_steps": demonstration_steps,
+                "timestamp": datetime.datetime.now(timezone.utc)
+            }
+            return self.skills_collection.insert_one(document).inserted_id
+        except Exception as e:
+            self.logger.error(f"Error al guardar demostración: {e}", exc_info=True)
+            return None
+
+    def find_similar_demonstration(self, current_task_description: str, threshold: float = 0.8) -> dict:
+        """
+        Busca una demostración similar en la colección de habilidades.
+        Retorna la demostración más similar si su score excede el umbral, de lo contrario None.
+        """
+        if not self.operativo or not self.model_provider:
+            self.logger.warning("La memoria no puede buscar demostraciones: no operativa o sin proveedor de modelo.")
+            return None
+
+        self.logger.info(f"Buscando demostración similar para la tarea: '{current_task_description}'")
+        try:
+            query_embedding = self.model_provider.embed_content(current_task_description)
+            if not query_embedding:
+                self.logger.error("No se pudo generar el embedding para la descripción de la tarea actual.")
+                return None
+
+            pipeline = [
+                {
+                    "$vectorSearch": {
+                        "index": "vector_index_skills", # Asumimos un índice vectorial para skills
+                        "path": "embedding",
+                        "queryVector": query_embedding,
+                        "numCandidates": 10,
+                        "limit": 1
+                    }
+                },
+                {
+                    "$project": {
+                        "_id": 0,
+                        "task_description": 1,
+                        "demonstration_steps": 1,
+                        "score": {"$meta": "vectorSearchScore"}
+                    }
+                }
+            ]
+
+            results = list(self.skills_collection.aggregate(pipeline))
+
+            if results and results[0]["score"] >= threshold:
+                self.logger.info(f"Demostración similar encontrada con score: {results[0]['score']}")
+                return results[0]
+            else:
+                self.logger.info("No se encontraron demostraciones similares por encima del umbral.")
+                return None
+        except Exception as e:
+            self.logger.error(f"Error al buscar demostración similar: {e}", exc_info=True)
             return None
 
     def _recuperar_historial_crudo(self, session_key: str, limit: int = 50):
