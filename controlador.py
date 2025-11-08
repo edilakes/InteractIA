@@ -2,6 +2,8 @@ import pyautogui
 import time
 import os
 import logging
+import grabador # Importar el módulo grabador
+from utils import wait_for_condition # Importar la función de espera inteligente
 
 class Controlador:
     """
@@ -17,7 +19,7 @@ class Controlador:
         self.logger.debug("Controlador inicializado.")
 
     def enfocar_ventana(self, titulo: str) -> bool:
-        """Encuentra una ventana por su título y la activa (la trae al frente)."""
+        grabador.record_action("enfocar_ventana", {"titulo": titulo})
         try:
             ventanas = pyautogui.getWindowsWithTitle(titulo)
             if ventanas:
@@ -33,6 +35,7 @@ class Controlador:
             return False
 
     def mover_raton(self, x, y, duracion=1):
+        grabador.record_action("mover_raton", {"x": x, "y": y, "duracion": duracion})
         self.logger.info(f"Moviendo ratón a ({x}, {y}).")
         pyautogui.moveTo(x, y, duration=duracion)
 
@@ -42,6 +45,7 @@ class Controlador:
         return pos
 
     def escribir(self, texto, intervalo=0.05):
+        grabador.record_action("escribir", {"texto": texto, "intervalo": intervalo})
         self.logger.info(f"Escribiendo texto de longitud {len(texto)}.")
         pyautogui.write(texto, interval=intervalo)
 
@@ -50,15 +54,25 @@ class Controlador:
         pyautogui.screenshot(nombre_archivo)
         return nombre_archivo
 
-    def esperar(self, segundos):
-        self.logger.info(f"Esperando {segundos} segundos.")
-        time.sleep(segundos)
+    def esperar(self, segundos: int = 0, condition_type: str = None, value: str = None, timeout: int = 10):
+        grabador.record_action("esperar", {"segundos": segundos, "condition_type": condition_type, "value": value, "timeout": timeout})
+        
+        if condition_type and value:
+            self.logger.info(f"Esperando condición '{condition_type}' con valor '{value}' (timeout: {timeout}s).")
+            return wait_for_condition(condition_type, value, timeout)
+        elif segundos > 0:
+            self.logger.info(f"Esperando {segundos} segundos.")
+            time.sleep(segundos)
+            return True
+        return False
 
     def clic(self, x=None, y=None, boton='left'):
+        grabador.record_action("clic", {"x": x, "y": y, "boton": boton})
         self.logger.info(f"Haciendo clic con botón {boton} en ({x}, {y}).")
         pyautogui.click(x, y, button=boton)
 
     def presionar_tecla(self, tecla):
+        grabador.record_action("presionar_tecla", {"tecla": tecla})
         self.logger.info(f"Presionando tecla: '{tecla}'.")
         if '+' in tecla:
             partes = tecla.split('+')
@@ -82,18 +96,22 @@ class Controlador:
         pyautogui.keyUp(tecla)
 
     def scroll(self, clics):
+        grabador.record_action("scroll", {"clics": clics})
         self.logger.info(f"Haciendo scroll ({clics} clics). Positivo es arriba, negativo es abajo.")
         pyautogui.scroll(clics)
 
     def mouse_down(self, boton='left'):
+        grabador.record_action("mouse_down", {"boton": boton})
         self.logger.info(f"Manteniendo presionado el botón del ratón: '{boton}'.")
         pyautogui.mouseDown(button=boton)
 
     def mouse_up(self, boton='left'):
+        grabador.record_action("mouse_up", {"boton": boton})
         self.logger.info(f"Soltando el botón del ratón: '{boton}'.")
         pyautogui.mouseUp(button=boton)
 
     def arrastrar_a(self, x, y, duracion=1.0):
+        grabador.record_action("arrastrar_a", {"x": x, "y": y, "duracion": duracion})
         self.logger.info(f"Arrastrando el ratón a ({x}, {y}).")
         pyautogui.dragTo(x, y, duration=duracion)
 
