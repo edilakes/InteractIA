@@ -21,35 +21,25 @@ LOG_FILE_PATH = "interactia_debug.log"
 # Funciones
 # ---
 
-def get_latest_session_id_from_log(log_path):
-    """Lee el archivo de log desde el final para encontrar el último ID de sesión, manejando logs JSON."""
+def get_latest_session_id_from_db():
+    """Lee la base de datos para encontrar el último ID de sesión."""
+    if not MONGO_URI or "SU_CADENA_DE_CONEXION" in MONGO_URI:
+        print("Error: La variable de entorno MONGO_URI no está configurada o es inválida.")
+        return
+
     try:
-        with open(log_path, 'r', encoding='utf-8') as f:
-            lines = f.readlines()
-        
-        # Buscar el ID de sesión desde la última línea hacia atrás
-        for line in reversed(lines):
-            try:
-                log_entry = json.loads(line)
-                message = log_entry.get('message', '')
-                # También buscar en el campo 'module' o 'function' si es relevante
-                if "agente" in log_entry.get('module', '') or "agente" in log_entry.get('function', ''):
-                    match = re.search(r'interactia-([a-zA-Z0-9]+)', message)
-                    if match:
-                        session_id = match.group(0)
-                        print(f"Último ID de sesión encontrado: {session_id}")
-                        return session_id
-            except json.JSONDecodeError:
-                # Si no es JSON, intentar el método antiguo
-                match = re.search(r'interactia-([a-zA-Z0-9]+)', line)
-                if match:
-                    session_id = match.group(0)
-                    print(f"Último ID de sesión encontrado: {session_id}")
-                    return session_id
-    except FileNotFoundError:
-        print(f"Error: No se encontró el archivo de log en '{log_path}'")
+        client = pymongo.MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
+        client.admin.command('ping')
+        db = client[MONGODB_DATABASE_NAME]
+        collection_chats = db[MONGODB_CHAT_COLLECTION]
+
+        latest_session = collection_chats.find_one(sort=[("timestamp", pymongo.DESCENDING)])
+        if latest_session:
+            session_id = latest_session.get("session_key")
+            print(f"Último ID de sesión encontrado en la base de datos: {session_id}")
+            return session_id
     except Exception as e:
-        print(f"Error al leer el archivo de log: {e}")
+        print(f"Error al leer la base de datos: {e}")
     return None
 
 def get_chat_history(session_id):
@@ -88,23 +78,13 @@ def get_chat_history(session_id):
     except Exception as e:
         print(f"Ocurrió un error inesperado al obtener el chat: {e}")
 
-def get_session_logs(session_id, log_path):
-    """Filtra y muestra los logs para un ID de sesión específico, manejando logs JSON."""
-    print(f"\n--- Logs para la sesión: {session_id} ---")
+def get_all_logs(log_path):
+    """Muestra todos los logs del archivo."""
+    print(f"\n--- Logs del archivo: {log_path} ---")
     try:
         with open(log_path, 'r', encoding='utf-8') as f:
             for line in f:
-                line = line.strip()
-                try:
-                    log_json = json.loads(line)
-                    message = log_json.get('message', '')
-                    # Check if session_id is in the message or if it's an agent's log for this session
-                    if session_id in message or (session_id in log_json.get('module', '') or session_id in log_json.get('function', '')):
-                        print(f"[{log_json.get('timestamp')}] [{log_json.get('level')}] [{log_json.get('module')}:{log_json.get('function')}:{log_json.get('line')}] {log_json.get('message')}")
-                except json.JSONDecodeError:
-                    # Fallback for non-JSON lines, though all InteractIA logs should be JSON now
-                    if session_id in line:
-                        print(f"[RAW] {line}")
+                print(line.strip())
     except FileNotFoundError:
         print(f"Error: No se encontró el archivo de log en '{log_path}'")
     except Exception as e:
@@ -120,10 +100,10 @@ if __name__ == "__main__":
     session_to_find = args.session_id
     
     if not session_to_find:
-        session_to_find = get_latest_session_id_from_log(LOG_FILE_PATH)
+        session_to_find = get_latest_session_id_from_db()
 
     if session_to_find:
         get_chat_history(session_to_find)
-        get_session_logs(session_to_find, LOG_FILE_PATH)
+        get_all_logs(LOG_FILE_PATH)
     else:
         print("No se pudo determinar un ID de sesión para continuar.")
