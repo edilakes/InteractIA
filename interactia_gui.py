@@ -1,15 +1,11 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 import threading
-
-from agente import Agente # MODIFICADO: Usar Agente
-from model_manager import (
-    load_providers_from_db,
-    get_model_provider,
-    get_default_provider_config,
-    update_last_used_model
-)
+from agente import Agente
+from model_manager import get_model_provider
+from provider_db_manager import load_providers_from_db, get_default_provider_config, update_last_used_model
 from gui_model_manager import ProviderManagerWindow
+from considerations_manager_window import ConsiderationsManagerWindow
 
 class ChatMessage(tk.Frame):
     def __init__(self, parent, message, role, **kwargs):
@@ -97,6 +93,7 @@ class InteractIAGUI:
         # Menú Conocimiento
         knowledge_menu = tk.Menu(self.menu_bar, tearoff=0)
         self.menu_bar.add_cascade(label="Conocimiento", menu=knowledge_menu)
+        knowledge_menu.add_command(label="Gestionar Consideraciones...", command=self._open_considerations_manager_window)
         # Aquí se pueden añadir más opciones en el futuro
 
     def _create_widgets(self):
@@ -341,6 +338,9 @@ class InteractIAGUI:
     def _open_provider_manager_window(self):
         ProviderManagerWindow(self.root)
 
+    def _open_considerations_manager_window(self):
+        ConsiderationsManagerWindow(self.root)
+
     def show_error_and_exit(self, message):
         messagebox.showerror("Error Crítico", message, parent=self.root)
         self.root.destroy()
@@ -352,16 +352,16 @@ class InteractIAGUI:
         self.root.destroy()
 
     def _on_stop_clicked(self):
-        # MODIFICADO: La V2 no tiene parada de emergencia aún.
-        self.insert_log_message("Función 'Detener' no implementada en V2.")
-        # if self.agente:
-        #     self.agente.detener_proceso_emergencia()
-        #     self.insert_log_message("Solicitud de parada de emergencia enviada.")
+        if self.agente:
+            self.agente.request_stop()
+            self.insert_log_message("Solicitud de parada de emergencia enviada al agente.")
+        else:
+            self.insert_log_message("Agente no inicializado.")
 
     def _run_agent_cycle_threaded(self, command):
         """Wrapper para ejecutar el ciclo del agente en un hilo y manejar el fin."""
         try:
-            self.agente.run_cycle(user_message=command, session_id=self.titulo_ventana)
+            self.agente.execute_task(initial_user_message=command, session_id=self.titulo_ventana)
         except Exception as e:
             self.insert_log_message(f"Error en el ciclo del agente: {e}")
         finally:

@@ -1,115 +1,82 @@
-# Plan de Pruebas para InteractIA
+# Plan para la Gestión de "Consideraciones Adicionales"
 
-Este documento describe el plan de pruebas para el agente InteractIA, cubriendo sus funcionalidades principales y la verificación a través de los logs. El objetivo es asegurar que todas las funciones operan correctamente y que el sistema maneja adecuadamente los diferentes escenarios en un entorno lo más real posible.
+Este plan detalla los pasos para implementar un gestor de "Consideraciones Adicionales" en InteractIA, permitiendo al usuario guardar notas relevantes para las tareas del agente en MongoDB y gestionarlas a través de una interfaz gráfica.
 
-## Enfoque de Pruebas: Pruebas de Integración y Revisión de Logs
+## 1. Diseño de la Base de Datos (MongoDB)
 
-A diferencia de las pruebas unitarias aisladas, este plan se centrará en ejecutar el agente en un entorno funcional (o simulado de forma realista) y verificar su comportamiento a través de los logs generados. Esto nos permitirá observar cómo interactúan los diferentes componentes del agente y cómo responde a situaciones diversas.
+### 1.1. Estructura de la Colección "consideraciones"
+Se creará una nueva colección en MongoDB llamada `consideraciones`. Cada documento en esta colección representará una consideración y tendrá la siguiente estructura:
 
-## Fases del Plan de Pruebas
+```json
+{
+  "_id": ObjectId("..."), // ID único generado por MongoDB
+  "nombre": "string",      // Nombre o título de la consideración (ej. "Mi flujo de trabajo para abrir apps")
+  "contenido": "string",   // Contenido detallado de la consideración (la nota en sí)
+  "fecha_creacion": "datetime", // Fecha y hora de creación
+  "fecha_actualizacion": "datetime" // Fecha y hora de la última actualización
+}
+```
 
-### Fase 1: Configuración y Funcionalidad Básica
+### 1.2. Módulo de Gestión de Base de Datos (`considerations_db_manager.py`)
+**[COMPLETADO]** Se creará un nuevo archivo `considerations_db_manager.py` que contendrá funciones para interactuar con la colección `consideraciones`:
 
-1.  **Configuración del Entorno:**
-    *   **Objetivo:** Verificar que todas las dependencias están instaladas y que la conexión a MongoDB es exitosa en un entorno real.
-    *   **Pasos:**
-        *   Asegurar que todas las dependencias estén instaladas (`pip install -r requirements.txt`).
-        *   Verificar que el servicio de MongoDB esté en ejecución y sea accesible.
-        *   Confirmar que la variable de entorno `MONGO_URI` en `config.py` apunte a una instancia de MongoDB válida.
-        *   Ejecutar el agente o un script de inicialización que intente conectar la memoria.
-    *   **Verificación (Logs):** Buscar mensajes de "Memoria conectada a MongoDB." y la ausencia de errores de conexión en los logs del agente.
+*   `get_all_considerations()`: Recupera todas las consideraciones.
+*   `add_consideration(nombre, contenido)`: Añade una nueva consideración.
+*   `update_consideration(id, nombre, contenido)`: Actualiza una consideración existente por su `_id`.
+*   `delete_consideration(id)`: Elimina una consideración por su `_id`.
+*   `get_consideration_by_name(nombre)`: Recupera una consideración por su nombre.
 
-2.  **Inicialización del Agente:**
-    *   **Objetivo:** Confirmar que la clase `Agente` se inicializa correctamente en un entorno real.
-    *   **Pasos:**
-        *   Ejecutar el agente principal (e.g., `main.py` si existe un punto de entrada).
-    *   **Verificación (Logs):** Buscar "Inicializando Agente..." y confirmación de la configuración del modelo en los logs.
-    *   **Estado:** Completado (la verificación de la inicialización básica se realizó con un test unitario, pero se revalidará en este contexto de pruebas reales).
+Este módulo utilizará `pymongo` y la `MONGO_URI` configurada en `.env`.
 
-### Fase 2: Pruebas de Acciones Principales
+## 2. Implementación de la Interfaz Gráfica (GUI)
 
-1.  **Acciones Primitivas (Controlador):**
-    *   **Objetivo:** Verificar la ejecución correcta de cada acción de bajo nivel del controlador en el sistema operativo.
-    *   **Pasos (para cada acción):**
-        *   Diseñar un escenario donde el agente deba ejecutar una acción primitiva específica (e.g., pedirle que mueva el ratón a una posición, escriba un texto, haga clic).
-        *   Observar el comportamiento en pantalla (si es posible) y el resultado de la acción.
-    *   **Acciones a Probar (ejemplos):**
-        *   `mover_raton(x, y, duracion)`
-        *   `escribir(texto, intervalo)`
-        *   `clic(x=None, y=None, boton='left')`
-        *   `presionar_tecla(tecla)`
-        *   `scroll(clics)`
-        *   `esperar(segundos)`
-    *   **Verificación (Logs):** Buscar "Ejecutando acción primitiva: [nombre_accion] con args: [args]" y "Resultado de la acción [nombre_accion]: [resultado]" en los logs.
+### 2.1. Añadir Entrada de Menú en `interactia_gui.py`
+**[COMPLETADO]** Se modificará `interactia_gui.py` para añadir una nueva opción en el menú principal (ej. "Herramientas" o "Configuración") que abrirá la ventana del gestor de consideraciones.
 
-2.  **Acciones Compuestas (Orquestador):**
-    *   **Objetivo:** Verificar la secuencia de acciones para tareas más complejas que involucran múltiples pasos.
-    *   **Pasos (para cada acción):**
-        *   Diseñar un escenario donde el agente deba ejecutar una acción compuesta (e.g., pedirle que navegue a una URL, busque en Google).
-        *   Observar el comportamiento en pantalla y el resultado de la secuencia de acciones.
-    *   **Acciones a Probar (ejemplos):**
-        *   `navegar_a_url(url)`: Probar con una URL válida.
-        *   `buscar_en_google(termino_busqueda)`: Probar con un término de búsqueda.
-    *   **Verificación (Logs):** Buscar "Ejecutando acción compuesta: [nombre_accion] con args: [args]" y "Resultado de la acción [nombre_accion]: [resultado]" en los logs, así como los logs de las acciones primitivas subyacentes.
+### 2.2. Ventana del Gestor de Consideraciones (`considerations_manager_window.py`)
+**[COMPLETADO]** Se creará un nuevo archivo `considerations_manager_window.py` que contendrá una clase `ConsiderationsManagerWindow` (heredando de `tk.Toplevel`) con la siguiente funcionalidad:
 
-3.  **Acciones Internas:**
-    *   **Objetivo:** Asegurar que las acciones internas del agente funcionan y actualizan el contexto correctamente.
-    *   **Pasos (para cada acción):**
-        *   Diseñar un escenario donde el agente deba ejecutar una acción interna (e.g., pedirle que analice la pantalla, consulte la base de conocimiento).
-    *   **Acciones a Probar (ejemplos):**
-        *   `responder_chat(mensaje)`: Verificar que el mensaje se envía al comunicador.
-        *   `analizar_pantalla()`: Verificar que `vision_analysis` se actualiza.
-        *   `consultar_base_conocimiento(termino_busqueda)`: Verificar que `kb_info` se actualiza.
-        *   `finalizar_tarea(mensaje_final)`: Verificar que la tarea se marca como finalizada.
-    *   **Verificación (Logs):** Buscar mensajes específicos de cada acción interna y confirmación de actualizaciones de contexto en los logs.
+*   **Visualización:** Un `ttk.Treeview` o `tk.Listbox` para mostrar el `nombre` de todas las consideraciones existentes.
+*   **Botones de Acción:**
+    *   "Añadir": Abre un diálogo (`AddEditConsiderationDialog`) para crear una nueva consideración.
+    *   "Editar": Abre un diálogo (`AddEditConsiderationDialog`) con los datos de la consideración seleccionada para su edición.
+    *   "Eliminar": Elimina la consideración seleccionada (con confirmación).
+*   **Diálogo Añadir/Editar (`AddEditConsiderationDialog`):** Una clase `tk.Toplevel` para un formulario simple con campos de entrada para `nombre` y `contenido` de la consideración.
 
-### Fase 3: Gestión de Memoria y Contexto
+## 3. Integración con el Agente (`agente.py`)
 
-1.  **Historial de Chat:**
-    *   **Objetivo:** Confirmar que los mensajes se guardan y recuperan correctamente de MongoDB durante interacciones reales.
-    *   **Pasos:**
-        *   Realizar varias interacciones con el agente.
-        *   Después de las interacciones, revisar directamente la base de datos MongoDB para verificar los mensajes guardados.
-    *   **Verificación (Logs):** Buscar "Recuperando historial de chat para la sesión..." y "Guardando mensaje..." en los logs.
+### 3.1. Carga de Consideraciones en el Agente
+**[COMPLETADO]** Se modificará la clase `Agente` en `agente.py` para que, al inicializarse o al iniciar un ciclo de tarea, cargue las consideraciones relevantes (posiblemente todas, o filtradas por algún criterio futuro) desde `considerations_db_manager.py`.
 
-2.  **Actualizaciones de Contexto:**
-    *   **Objetivo:** Asegurar que `vision_analysis` y `kb_info` se actualizan después de las acciones correspondientes en un flujo de trabajo real.
-    *   **Pasos:**
-        *   Ejecutar `analizar_pantalla()` y `consultar_base_conocimiento()` a través de interacciones con el agente.
-        *   Revisar los logs para confirmar que los valores de `self.vision_analysis` y `self.kb_info` se registran como actualizados.
-    *   **Verificación (Logs):** Buscar mensajes de actualización de contexto en los logs.
+### 3.2. Actualización del Prompt Maestro
+**[COMPLETADO]** Se modificará `MASTER_PROMPT_TEMPLATE` en `agente.py` para incluir un nuevo campo de contexto que contenga las "Consideraciones Adicionales" cargadas. Esto permitirá al LLM tener acceso a esta información al tomar decisiones.
 
-3.  **Interacción con el LLM:**
-    *   **Objetivo:** Verificar que el LLM recibe el prompt correcto y que sus decisiones se parsean adecuadamente.
-    *   **Pasos:**
-        *   Realizar una interacción con el agente y revisar el prompt completo enviado al LLM (si es posible configurarlo para que se loguee).
-        *   Revisar la respuesta bruta del LLM y el JSON parseado en los logs.
-    *   **Verificación (Logs):** Buscar "Enviando petición al modelo de IA...", "Respuesta BRUTA del modelo:", y "Contenido de json_str antes de parsear:" en los logs.
+```
+MASTER_PROMPT_TEMPLATE = """
+...
+INFORMACIÓN DE LA BASE DE CONOCIMIENTO:
+{info_conocimiento}
 
-### Fase 4: Manejo de Errores y Casos Extremos
+CONSIDERACIONES ADICIONALES:
+{consideraciones_adicionales}
 
-1.  **Acciones Inválidas:**
-    *   **Objetivo:** Probar cómo el agente maneja solicitudes de acciones no existentes o mal formadas.
-    *   **Pasos:**
-        *   Solicitar al agente que ejecute una acción con un nombre inventado o con argumentos incorrectos.
-    *   **Verificación (Logs):** Buscar "Acción primitiva desconocida:" o un mensaje de error similar en los logs.
+TAREA ACTUAL DEL USUARIO: "{user_message}"
+...
+"""
+```
 
-2.  **Errores de Conexión a MongoDB:**
-    *   **Objetivo:** Simular problemas de conexión a MongoDB y observar el comportamiento del agente.
-    *   **Pasos:**
-        *   Detener el servicio de MongoDB (o modificar `MONGO_URI` a uno inválido en `config.py`).
-        *   Intentar inicializar el agente o guardar/recuperar mensajes.
-    *   **Verificación (Logs):** Buscar "ERROR al inicializar MongoDBChatMemory:" o "Error al guardar mensaje:" en los logs.
+### 3.3. Lógica de Uso por el LLM
+**[COMPLETADO]** Se confiará en la capacidad del LLM para interpretar y utilizar las `consideraciones_adicionales` proporcionadas en el prompt para mejorar sus decisiones y la ejecución de tareas.
 
-3.  **Errores en la Respuesta del LLM:**
-    *   **Objetivo:** Simular respuestas vacías o mal formadas del LLM.
-    *   **Pasos:**
-        *   (Requiere modificación temporal del `ModelProvider` para simular estos errores o forzar una respuesta inválida).
-        *   Ejecutar un ciclo del agente con esta configuración.
-    *   **Verificación (Logs):** Buscar "Error al decodificar JSON:" o "La respuesta del modelo está vacía." en los logs.
+## 4. Pasos de Ejecución
 
----
-**Actualizaciones:**
-*   2025-11-05: Iniciando la verificación de "Fase 1: Configuración y Funcionalidad Básica - 2. Inicialización del Agente".
-*   2025-11-05: Completada la verificación de "Fase 1: Configuración y Funcionalidad Básica - 2. Inicialización del Agente". Se añadió `test_agente_initialization` a `test_agente_actions.py` y se corrigieron los tests existentes para que pasaran.
-*   2025-11-05: Se actualizó el plan de pruebas para enfocarse en pruebas de integración con el agente real y la verificación a través de logs, según la solicitud del usuario.
+1.  **[COMPLETADO]** Crear `considerations_db_manager.py` con las funciones CRUD.
+2.  **[COMPLETADO]** Crear `considerations_manager_window.py` con la interfaz de usuario para gestionar las consideraciones.
+3.  **[COMPLETADO]** Modificar `interactia_gui.py` para añadir la opción de menú que abre `ConsiderationsManagerWindow`.
+4.  **[COMPLETADO]** Modificar `agente.py`:
+    *   Importar `considerations_db_manager`.
+    *   Actualizar `__init__` para cargar consideraciones.
+    *   Actualizar `_run_single_cycle` para incluir `consideraciones_adicionales` en el `prompt`.
+    *   Actualizar `MASTER_PROMPT_TEMPLATE` con el nuevo campo.
+
+Este plan proporciona una hoja de ruta clara para la implementación de la funcionalidad de "Consideraciones Adicionales".

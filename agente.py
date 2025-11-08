@@ -9,6 +9,7 @@ from model_manager import ModelProvider
 from logger_config import setup_logging
 from controlador import Controlador
 from vision import capture_and_analyze_screen # Importar la función de visión
+from considerations_db_manager import considerations_db_manager # Importar el gestor de consideraciones
 
 # El "Prompt Maestro" que define el comportamiento del agente
 MASTER_PROMPT_TEMPLATE = """
@@ -23,7 +24,10 @@ ANÁLISIS DE LA PANTALLA:
 INFORMACIÓN DE LA BASE DE CONOCIMIENTO:
 {info_conocimiento}
 
-TAREA ACTUAL DEL USUARIO: "{user_message}"
+CONSIDERACIONES ADICIONALES:
+{consideraciones_adicionales}
+
+TAREA ACTUAL DEL USUARIO: \"{user_message}\" 
 
 DEBES responder ÚNICAMENTE con un objeto JSON que represente tu próxima acción. La estructura debe ser la siguiente:
 """
@@ -53,12 +57,18 @@ ACCIONES DISPONIBLES:
 - `buscar_en_google(termino_busqueda)`: Realiza una búsqueda en Google.
 
 **Acciones Internas:**
-- `responder_chat(mensaje)`: Envía un mensaje al usuario. **Úsala cuando la tarea esté completamente terminada o necesites una aclaración del usuario.**
+- `responder_chat(mensaje)`: Envía un mensaje al usuario. **Úsala cuando necesites una aclaración del usuario o para informarle sobre el progreso, pero no para finalizar la tarea.**
 - `analizar_pantalla()`: Realiza un análisis del entorno visual y actualiza el contexto.
 - `consultar_base_conocimiento(termino_busqueda)`: Busca en la base de conocimiento y actualiza el contexto.
-- `finalizar_tarea(mensaje_final)`: Indica que la tarea ha sido completada. **Úsala solo cuando la tarea del usuario esté 100% resuelta y no haya más pasos pendientes.**
+- `finalizar_tarea(mensaje_final)`: Indica que la tarea ha sido completada. **Úsala solo cuando la tarea del usuario esté 100% resuelta y no haya más pasos pendientes. Proporciona un mensaje claro de finalización.**
+- `tarea_completada()`: **Úsala cuando la tarea del usuario haya sido resuelta y no necesites enviar un mensaje específico al usuario, simplemente para indicar que has terminado.**
 
 Elige la acción más lógica para avanzar hacia la solución de la tarea del usuario. Si la tarea requiere múltiples pasos, elige la siguiente acción necesaria. No finalices la tarea prematuramente.
+
+**Consideraciones Adicionales:**
+- Si la petición del usuario es una tarea simple y atómica (ej. "abre google.com", "escribe hola"), y has ejecutado la acción que la cumple directamente, DEBES usar `tarea_completada()` inmediatamente después de la ejecución exitosa de esa acción. No esperes a más ciclos ni intentes acciones adicionales a menos que el usuario lo solicite explícitamente.
+- Usa `finalizar_tarea(mensaje_final)` si necesitas proporcionar un resumen o una confirmación explícita al usuario de que la tarea compleja ha sido resuelta.
+- Usa `responder_chat(mensaje)` solo para aclaraciones o para informar sobre el progreso de una tarea multi-paso, no para finalizar la tarea.
 """
 
 # Descripción del esquema JSON esperado para la auto-corrección del LLM
@@ -88,6 +98,11 @@ class Agente:
         self.controlador = Controlador()
         self.vision_analysis = "No se ha realizado ningún análisis de pantalla aún."
         self.kb_info = "No se ha consultado la base de conocimiento aún."
+        self._stop_requested = False
+
+    def request_stop(self):
+        self.logger.info("Solicitud de detención recibida.")
+        self._stop_requested = True
 
     def _generar_prompt_correccion(self, malformed_response: str, error_message: str) -> str:
         return f"""
@@ -235,18 +250,39 @@ class Agente:
             
         return None # Indica que no es una acción compuesta conocida
 
+    def _load_additional_considerations(self) -> str:
+        """Carga las consideraciones adicionales desde la base de datos y las formatea."""
+        try:
+            considerations = considerations_db_manager.get_all_considerations()
+            if not considerations:
+                return "No hay consideraciones adicionales."
+            
+            formatted_considerations = []
+            for cons in considerations:
+                formatted_considerations.append(f"- {cons['nombre']}: {cons['contenido']}")
+            
+            return "\n".join(formatted_considerations)
+        except Exception as e:
+            self.logger.error(f"Error al cargar consideraciones adicionales: {e}", exc_info=True)
+            return "Error al cargar las consideraciones adicionales."
+
     def _run_single_cycle(self, user_message: str, session_id: str) -> str:
+        if self._stop_requested:
+            self.logger.info("Ciclo de agente detenido por solicitud del usuario.")
+            return "stopped"
         self.logger.info(f"--- Iniciando ciclo para mensaje: '{user_message}' ---")
 
         # 1. Recopilar contexto
         historial_raw = self.memoria._recuperar_historial_crudo(session_key=session_id)
         historial_chat = self.memoria.convertir_historial_a_formato_simple(historial_raw)
+        additional_considerations = self._load_additional_considerations()
         
         # 2. Construir el prompt
         prompt = MASTER_PROMPT_TEMPLATE.format(
             historial_chat="\n".join([f"{msg['rol']}: {msg['contenido']}" for msg in historial_chat]),
             analisis_pantalla=self.vision_analysis,
             info_conocimiento=self.kb_info,
+            consideraciones_adicionales=additional_considerations,
             user_message=user_message
         )
         prompt += JSON_ACTION_EXAMPLE
@@ -285,11 +321,14 @@ class Agente:
                         resultado = "Consulta a la KB completada."
                     else:
                         resultado = "Error: No se proporcionó término de búsqueda para la KB."
+                elif accion == "tarea_completada":
+                    self.comunicador.hablar("Tarea completada.")
+                    resultado = "Tarea marcada como completada."
                 else:
                     resultado = self._ejecutar_accion_primitiva(accion, argumentos)
             
             self.logger.info(f"Resultado de la acción '{accion}': {resultado}")
-            if accion not in ["responder_chat", "finalizar_tarea", "analizar_pantalla", "consultar_base_conocimiento"]:
+            if accion not in ["responder_chat", "finalizar_tarea", "analizar_pantalla", "consultar_base_conocimiento", "tarea_completada"]:
                  self.comunicador.hablar(f"Acción '{accion}' ejecutada.")
 
         self.memoria.guardar_mensaje(session_id, 'usuario', {'texto': user_message})
@@ -304,7 +343,7 @@ class Agente:
         max_task_cycles = 10 # Prevent infinite loops
         cycle_count = 0
 
-        while not task_completed and cycle_count < max_task_cycles:
+        while not task_completed and cycle_count < max_task_cycles and not self._stop_requested:
             cycle_count += 1
             self.logger.info(f"--- Ejecutando ciclo de tarea {cycle_count}/{max_task_cycles} ---")
             
@@ -312,7 +351,10 @@ class Agente:
             accion_ejecutada = self._run_single_cycle(current_message, session_id)
 
             # Determine if the task is completed based on the action executed
-            if accion_ejecutada in ["responder_chat", "finalizar_tarea"]:
+            if self._stop_requested:
+                task_completed = True
+                self.logger.info("Tarea detenida por solicitud del usuario.")
+            elif accion_ejecutada in ["responder_chat", "finalizar_tarea", "tarea_completada"]:
                 task_completed = True
                 self.logger.info(f"Tarea finalizada por acción: {accion_ejecutada}")
             else:
