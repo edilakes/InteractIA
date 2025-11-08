@@ -2,6 +2,7 @@ import json
 import logging
 import re
 import ast
+from enum import Enum
 
 from comunicador import Comunicador
 from memoria import MongoDBChatMemory
@@ -10,6 +11,19 @@ from logger_config import setup_logging
 from controlador import Controlador
 from vision import capture_and_analyze_screen # Importar la función de visión
 from considerations_db_manager import considerations_db_manager # Importar el gestor de consideraciones
+import grabador # Importar el módulo grabador
+from utils import wait_for_condition # Importar la función de espera inteligente
+
+# Define los estados posibles del agente
+class AgentState(Enum):
+    IDLE = "IDLE"
+    PLANNING = "PLANNING"
+    EXECUTING_ACTION = "EXECUTING_ACTION"
+    VERIFYING_ACTION = "VERIFYING_ACTION"
+    WAITING_FOR_USER_INPUT = "WAITING_FOR_USER_INPUT"
+    TASK_COMPLETED = "TASK_COMPLETED"
+    TASK_FAILED = "TASK_FAILED"
+    DEMONSTRATING = "DEMONSTRATING" # Nuevo estado para el modo de demostración
 
 # El "Prompt Maestro" que define el comportamiento del agente
 MASTER_PROMPT_TEMPLATE = """
@@ -38,7 +52,9 @@ JSON_ACTION_EXAMPLE = """
   "argumentos": {
     "param1": "valor1",
     ...
-  }
+  },
+  "confidence_score": 0.95, // Puntuación de confianza del 0.0 al 1.0 sobre la idoneidad de la acción.
+  "explanation": "Breve explicación de por qué se eligió esta acción."
 }
 """
 
@@ -84,6 +100,28 @@ El JSON debe tener la siguiente estructura:
 Asegúrate de que todas las claves y valores de cadena estén entre comillas dobles.
 """
 
+VERIFICATION_PROMPT_TEMPLATE = """
+Has ejecutado la acción "{accion_previa}" con los argumentos {argumentos_premios}.
+El resultado reportado de la ejecución fue: "{resultado_ejecucion}".
+
+Ahora, basándote en el siguiente ANÁLISIS DE LA PANTALLA, determina si la acción se ejecutó correctamente y logró su objetivo.
+
+ANÁLISIS DE LA PANTALLA ACTUAL:
+{analisis_pantalla}
+
+Responde ÚNICAMENTE con un objeto JSON que contenga:
+- "is_verified": true si la acción fue exitosa, false en caso contrario.
+- "explanation": Una breve explicación de tu decisión.
+
+Ejemplo de respuesta JSON:
+```json
+{{
+  "is_verified": true,
+  "explanation": "La ventana esperada se abrió y el texto 'Google' es visible."
+}}
+```
+"""
+
 class Agente:
     def __init__(self, model_provider: ModelProvider, model_name: str, callback_hablar=None):
         self.comunicador = Comunicador(callback_hablar=callback_hablar)
@@ -99,6 +137,7 @@ class Agente:
         self.vision_analysis = "No se ha realizado ningún análisis de pantalla aún."
         self.kb_info = "No se ha consultado la base de conocimiento aún."
         self._stop_requested = False
+        self.state = AgentState.IDLE # Inicializar el estado del agente
 
     def request_stop(self):
         self.logger.info("Solicitud de detención recibida.")
@@ -166,12 +205,28 @@ class Agente:
                         self.logger.warning(f"{error_message}. Contenido: '{json_str_fixed_quotes}'")
 
             if parsed_json:
-                # Validar el esquema básico
-                if isinstance(parsed_json, dict) and "accion" in parsed_json and "argumentos" in parsed_json:
+                # Validar el esquema para la decisión de acción
+                is_action_decision = isinstance(parsed_json, dict) and \
+                                     "accion" in parsed_json and \
+                                     "argumentos" in parsed_json and \
+                                     "confidence_score" in parsed_json and \
+                                     "explanation" in parsed_json and \
+                                     isinstance(parsed_json["confidence_score"], (int, float)) and \
+                                     0.0 <= parsed_json["confidence_score"] <= 1.0 and \
+                                     isinstance(parsed_json["explanation"], str)
+                
+                # Validar el esquema para la verificación de acción
+                is_verification_response = isinstance(parsed_json, dict) and \
+                                           "is_verified" in parsed_json and \
+                                           "explanation" in parsed_json and \
+                                           isinstance(parsed_json["is_verified"], bool) and \
+                                           isinstance(parsed_json["explanation"], str)
+
+                if is_action_decision or is_verification_response:
                     self.logger.info(f"JSON parseado y validado exitosamente en intento {retry_count + 1}.")
                     return parsed_json
                 else:
-                    error_message = "El JSON no contiene las claves 'accion' y 'argumentos' o no es un diccionario válido."
+                    error_message = "El JSON no contiene las claves esperadas para una decisión de acción ('accion', 'argumentos', 'confidence_score', 'explanation') ni para una respuesta de verificación ('is_verified', 'explanation'), o sus tipos/rangos no son válidos."
                     self.logger.warning(f"Validación de esquema fallida: {error_message}")
             
             # Si llegamos aquí, el parseo o la validación fallaron
@@ -190,6 +245,36 @@ class Agente:
         
         # Esto solo se alcanzará si el bucle termina sin éxito y sin retornar en el último intento
         return {"accion": "responder_chat", "argumentos": {"mensaje": f"Error interno desconocido durante el parseo de la respuesta del modelo."}}
+
+    def _handle_low_confidence_interaction(self, accion: str, argumentos: dict, confidence_score: float, explanation: str, user_message: str) -> dict:
+        """
+        Maneja la interacción con el usuario cuando la confianza del LLM es baja.
+        Retorna un diccionario con la acción a seguir (ej. {"decision": "proceder"}, {"decision": "corregir", "new_message": "..."})
+        """
+        self.comunicador.hablar(f"No estoy muy seguro de cómo proceder con la acción '{accion}'.")
+        self.comunicador.hablar(f"Mi confianza es del {confidence_score:.0%}. Explicación: {explanation}")
+        self.comunicador.hablar("¿Qué te gustaría hacer?")
+        self.comunicador.hablar("[P]roceder con la acción sugerida")
+        self.comunicador.hablar("[C]orregir el plan con nuevas instrucciones")
+        self.comunicador.hablar("[M]ostrarme cómo hacerlo (modo de demostración)")
+
+        while True:
+            user_choice = input("Tu elección (P/C/M): ").strip().upper()
+            if user_choice == 'P':
+                self.comunicador.hablar("Procediendo con la acción sugerida.")
+                return {"decision": "proceder"}
+            elif user_choice == 'C':
+                new_instructions = input("Por favor, introduce tus nuevas instrucciones para corregir el plan: ").strip()
+                if new_instructions:
+                    self.comunicador.hablar("Instrucciones recibidas. Re-evaluando el plan.")
+                    return {"decision": "corregir", "new_message": new_instructions}
+                else:
+                    self.comunicador.hablar("No se proporcionaron nuevas instrucciones. Por favor, elige de nuevo.")
+            elif user_choice == 'M':
+                self.comunicador.hablar("Entrando en modo de demostración. Por favor, realiza la tarea.")
+                return {"decision": "demostrar"}
+            else:
+                self.comunicador.hablar("Opción no válida. Por favor, elige P, C o M.")
 
     def _query_llm(self, prompt: str) -> dict:
         self.logger.info("Enviando petición al modelo de IA...")
@@ -227,10 +312,12 @@ class Agente:
             if not url:
                 return "Error: La URL no fue proporcionada para navegar."
             self.controlador.presionar_tecla("win+r")
-            self.controlador.esperar(1)
+            # self.controlador.esperar(1) # Reemplazado por espera inteligente
+            wait_for_condition("window_open", "Google Chrome", timeout=5) # Espera hasta 5 segundos a que se abra Chrome
             self.controlador.escribir("chrome")
             self.controlador.presionar_tecla("enter")
-            self.controlador.esperar(2)
+            # self.controlador.esperar(2) # Reemplazado por espera inteligente
+            wait_for_condition("window_open", "Google Chrome", timeout=5) # Espera hasta 5 segundos a que se abra Chrome
             self.controlador.escribir(url)
             self.controlador.presionar_tecla("enter")
             return f"Navegación a {url} completada."
@@ -240,10 +327,12 @@ class Agente:
             if not termino:
                 return "Error: El término de búsqueda no fue proporcionado."
             self.controlador.presionar_tecla("win+r")
-            self.controlador.esperar(1)
+            # self.controlador.esperar(1) # Reemplazado por espera inteligente
+            wait_for_condition("window_open", "Google Chrome", timeout=5) # Espera hasta 5 segundos a que se abra Chrome
             self.controlador.escribir("chrome")
             self.controlador.presionar_tecla("enter")
-            self.controlador.esperar(2)
+            # self.controlador.esperar(2) # Reemplazado por espera inteligente
+            wait_for_condition("window_open", "Google Chrome", timeout=5) # Espera hasta 5 segundos a que se abra Chrome
             self.controlador.escribir(f"https://www.google.com/search?q={termino.replace(' ', '+')}")
             self.controlador.presionar_tecla("enter")
             return f"Búsqueda de '{termino}' en Google completada."
@@ -273,10 +362,19 @@ class Agente:
         self.logger.info(f"--- Iniciando ciclo para mensaje: '{user_message}' ---")
 
         # 1. Recopilar contexto
-        historial_raw = self.memoria._recuperar_historial_crudo(session_key=session_id)
+        historial_raw = self.memoria._recuperar_historial_crudo(session_id)
         historial_chat = self.memoria.convertir_historial_a_formato_simple(historial_raw)
         additional_considerations = self._load_additional_considerations()
         
+        # 1.1. Análisis de Novedad: Buscar demostraciones similares
+        similar_demonstration = self.memoria.find_similar_demonstration(user_message)
+        if similar_demonstration:
+            self.logger.info(f"Se encontró una demostración similar para la tarea: '{similar_demonstration['task_description']}' con score: {similar_demonstration['score']}.")
+            # Aquí podríamos decidir ejecutar la demostración directamente o usarla para enriquecer el prompt del LLM
+            # Por ahora, solo registramos que se encontró.
+        else:
+            self.logger.info("No se encontraron demostraciones similares para esta tarea. Podría ser una tarea nueva.")
+
         # 2. Construir el prompt
         prompt = MASTER_PROMPT_TEMPLATE.format(
             historial_chat="\n".join([f"{msg['rol']}: {msg['contenido']}" for msg in historial_chat]),
@@ -292,8 +390,33 @@ class Agente:
         decision_json = self._query_llm(prompt)
         accion = decision_json.get("accion")
         argumentos = decision_json.get("argumentos", {})
+        confidence_score = decision_json.get("confidence_score", 0.0) # Default a 0.0 si no está presente
+        explanation = decision_json.get("explanation", "No se proporcionó explicación.")
         
-        self.logger.info(f"Acción decidida por el LLM: {accion}")
+        self.logger.info(f"Acción decidida por el LLM: {accion} (Confianza: {confidence_score:.2f})")
+        self.logger.debug(f"Explicación del LLM: {explanation}")
+
+        # --- Punto de Decisión para solicitar ayuda ---
+        if confidence_score < 0.8: # Umbral configurable
+            self.logger.warning(f"Baja confianza ({confidence_score:.2f}) en la acción '{accion}'. Solicitando ayuda al usuario.")
+            
+            interaction_result = self._handle_low_confidence_interaction(accion, argumentos, confidence_score, explanation, user_message)
+
+            if interaction_result["decision"] == "proceder":
+                self.comunicador.hablar("El usuario decidió proceder con la acción sugerida.")
+                # Continuar con la ejecución de la acción decidida por el LLM
+            elif interaction_result["decision"] == "corregir":
+                new_user_message = interaction_result["new_message"]
+                self.comunicador.hablar(f"Usuario corrigió el plan. Re-consultando al LLM con: '{new_user_message}'")
+                # Guardar el mensaje de corrección del usuario en el historial
+                self.memoria.guardar_mensaje(session_id, 'usuario', {'texto': new_user_message})
+                # Re-ejecutar el ciclo con el nuevo mensaje del usuario
+                return self._run_single_cycle(new_user_message, session_id) # Esto reinicia el ciclo con el nuevo mensaje
+            elif interaction_result["decision"] == "demostrar":
+                self.comunicador.hablar("El usuario ha solicitado entrar en modo de demostración.")
+                # Devolver una acción especial para que el bucle principal la maneje
+                return "demostrar_accion" 
+        # --- Fin del Punto de Decisión ---
 
         if not accion:
             resultado = "El modelo no especificó una acción a realizar."
@@ -330,6 +453,35 @@ class Agente:
             self.logger.info(f"Resultado de la acción '{accion}': {resultado}")
             if accion not in ["responder_chat", "finalizar_tarea", "analizar_pantalla", "consultar_base_conocimiento", "tarea_completada"]:
                  self.comunicador.hablar(f"Acción '{accion}' ejecutada.")
+                 
+                 # --- Verificación de Acciones ---
+                 self.state = AgentState.VERIFYING_ACTION
+                 self.logger.info(f"Verificando la acción '{accion}'...")
+                 current_screen_analysis = capture_and_analyze_screen() # Capturar nueva pantalla para verificación
+
+                 verification_prompt = VERIFICATION_PROMPT_TEMPLATE.format(
+                     accion_previa=accion,
+                     argumentos_premios=json.dumps(argumentos), # Convertir argumentos a string JSON
+                     resultado_ejecucion=resultado,
+                     analisis_pantalla=current_screen_analysis
+                 )
+                 
+                 # Consultar al LLM para la verificación
+                 verification_response = self._query_llm(verification_prompt)
+                 
+                 is_verified = verification_response.get("is_verified", False)
+                 verification_explanation = verification_response.get("explanation", "No se proporcionó explicación de verificación.")
+
+                 if is_verified:
+                     self.logger.info(f"Acción '{accion}' verificada exitosamente. Explicación: {verification_explanation}")
+                     self.comunicador.hablar(f"Acción '{accion}' verificada.")
+                 else:
+                     self.logger.warning(f"La acción '{accion}' NO pudo ser verificada. Explicación: {verification_explanation}")
+                     self.comunicador.hablar(f"Advertencia: La acción '{accion}' no pudo ser verificada. Necesito ayuda.")
+                     # Aquí podríamos añadir lógica para re-planificar o pedir ayuda al usuario
+                     # Por ahora, simplemente se registra la advertencia.
+                 self.state = AgentState.EXECUTING_ACTION # Volver al estado de ejecución para el siguiente ciclo
+                 # --- Fin Verificación de Acciones ---
 
         self.memoria.guardar_mensaje(session_id, 'usuario', {'texto': user_message})
         self.memoria.guardar_mensaje(session_id, 'agente', {'accion': accion, 'argumentos': argumentos, 'resultado': resultado})
@@ -343,10 +495,13 @@ class Agente:
         max_task_cycles = 10 # Prevent infinite loops
         cycle_count = 0
 
+        self.state = AgentState.PLANNING # Set initial state to PLANNING
+
         while not task_completed and cycle_count < max_task_cycles and not self._stop_requested:
             cycle_count += 1
             self.logger.info(f"--- Ejecutando ciclo de tarea {cycle_count}/{max_task_cycles} ---")
             
+            self.state = AgentState.EXECUTING_ACTION # Set state to EXECUTING_ACTION before each cycle
             # Execute a single cycle of the agent
             accion_ejecutada = self._run_single_cycle(current_message, session_id)
 
@@ -354,9 +509,29 @@ class Agente:
             if self._stop_requested:
                 task_completed = True
                 self.logger.info("Tarea detenida por solicitud del usuario.")
+                self.state = AgentState.TASK_FAILED # Task failed due to stop request
+            elif accion_ejecutada == "demostrar_accion":
+                self.state = AgentState.DEMONSTRATING # Set state to DEMONSTRATING
+                self.comunicador.hablar("¡Entendido! Por favor, realiza la tarea ahora. Todas tus acciones serán grabadas.")
+                self.comunicador.hablar("Cuando hayas terminado la demostración, presiona ENTER en esta consola.")
+                
+                grabador.start_recording()
+                input("Presiona ENTER para finalizar la demostración y que el agente aprenda...") # Espera la señal del usuario
+                recorded_steps = grabador.stop_recording()
+
+                if recorded_steps:
+                    self.memoria.save_demonstration(initial_user_message, recorded_steps)
+                    self.comunicador.hablar(f"¡Demostración grabada y guardada como una nueva habilidad para la tarea '{initial_user_message}'!")
+                else:
+                    self.comunicador.hablar("No se grabaron acciones durante la demostración.")
+                
+                task_completed = True # La tarea se considera completada después de la demostración
+                self.logger.info("Modo de demostración finalizado y tarea completada.")
+                self.state = AgentState.TASK_COMPLETED # Demonstration completed, task considered completed
             elif accion_ejecutada in ["responder_chat", "finalizar_tarea", "tarea_completada"]:
                 task_completed = True
                 self.logger.info(f"Tarea finalizada por acción: {accion_ejecutada}")
+                self.state = AgentState.TASK_COMPLETED # Task completed successfully
             else:
                 # For multi-step tasks, the agent needs to decide the next step.
                 # The 'current_message' for the next cycle should reflect the ongoing task.
@@ -366,10 +541,14 @@ class Agente:
                 self.logger.info(f"La tarea continúa. Acción ejecutada: {accion_ejecutada}")
                 # Optionally, update current_message based on the result of the last action
                 # For now, we rely on the LLM's ability to use chat history and screen analysis.
+                self.state = AgentState.PLANNING # After executing an action, go back to planning for the next step
 
         if not task_completed:
             self.logger.warning(f"La tarea no se completó después de {max_task_cycles} ciclos.")
             self.comunicador.hablar(f"No pude completar la tarea después de {max_task_cycles} intentos. Por favor, intenta de nuevo o sé más específico.")
+            self.state = AgentState.TASK_FAILED # Task failed due to max cycles reached
+        
+        self.state = AgentState.IDLE # Reset state to IDLE after task completion or failure
 
 
 if __name__ == '__main__':

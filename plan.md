@@ -1,82 +1,83 @@
-# Plan para la Gestión de "Consideraciones Adicionales"
+# Plan del Proyecto: Gemini CLI
 
-Este plan detalla los pasos para implementar un gestor de "Consideraciones Adicionales" en InteractIA, permitiendo al usuario guardar notas relevantes para las tareas del agente en MongoDB y gestionarlas a través de una interfaz gráfica.
+## Objetivo General
+Evolucionar InteractIA de un agente ejecutor a un **agente de aprendizaje interactivo**. El objetivo es que el agente pueda detectar su propia incertidumbre, dialogar con el usuario para solicitar ayuda y aprender de las demostraciones del usuario para mejorar su autonomía y base de conocimientos.
 
-## 1. Diseño de la Base de Datos (MongoDB)
+---
 
-### 1.1. Estructura de la Colección "consideraciones"
-Se creará una nueva colección en MongoDB llamada `consideraciones`. Cada documento en esta colección representará una consideración y tendrá la siguiente estructura:
+## Resumen de Avances Recientes (Estrategia de Aprendizaje Supervisado Interactivo)
 
-```json
-{
-  "_id": ObjectId("..."), // ID único generado por MongoDB
-  "nombre": "string",      // Nombre o título de la consideración (ej. "Mi flujo de trabajo para abrir apps")
-  "contenido": "string",   // Contenido detallado de la consideración (la nota en sí)
-  "fecha_creacion": "datetime", // Fecha y hora de creación
-  "fecha_actualizacion": "datetime" // Fecha y hora de la última actualización
-}
-```
+**Revisión del Plan:** El plan ha sido revisado. La mayoría de las fases de la "Estrategia de Aprendizaje Supervisado Interactivo" están completadas. El próximo enfoque es la "Verificación de Acciones".
 
-### 1.2. Módulo de Gestión de Base de Datos (`considerations_db_manager.py`)
-**[COMPLETADO]** Se creará un nuevo archivo `considerations_db_manager.py` que contendrá funciones para interactuar con la colección `consideraciones`:
+En este paso, se ha implementado la base de una estrategia de aprendizaje supervisado interactivo para InteractIA, permitiendo al agente detectar su incertidumbre y aprender de la interacción con el usuario.
 
-*   `get_all_considerations()`: Recupera todas las consideraciones.
-*   `add_consideration(nombre, contenido)`: Añade una nueva consideración.
-*   `update_consideration(id, nombre, contenido)`: Actualiza una consideración existente por su `_id`.
-*   `delete_consideration(id)`: Elimina una consideración por su `_id`.
-*   `get_consideration_by_name(nombre)`: Recupera una consideración por su nombre.
+**Fase 1: Detección de Incertidumbre - [HECHO]**
+- Se modificó `agente.py` para que el LLM devuelva una `confidence_score` y una `explanation` con cada acción sugerida.
+- Se implementó un "Análisis de Novedad" en `memoria.py` y `agente.py` para buscar demostraciones similares de tareas previas, lo que permite al agente identificar si una tarea es nueva o ya conocida.
 
-Este módulo utilizará `pymongo` y la `MONGO_URI` configurada en `.env`.
+**Fase 2: Diálogo y Solicitud de Ayuda - [HECHO]**
+- Se creó un "Punto de Decisión" en `agente.py` que, ante una baja confianza del LLM, pausa la ejecución.
+- Se implementó un "Mecanismo de Pausa y Diálogo" que presenta al usuario opciones para `[P]roceder`, `[C]orregir` el plan, o `[M]ostrar` cómo realizar la tarea.
 
-## 2. Implementación de la Interfaz Gráfica (GUI)
+**Fase 3: Adquisición de Conocimiento - [HECHO]**
+- Se desarrolló un "Modo de Grabación (Aprendizaje por Demostración)" mediante la creación del módulo `grabador.py`.
+- Se modificó `controlador.py` para que todas las acciones primitivas sean registradas por `grabador.py` cuando el modo de grabación está activo.
+- Se integró el proceso de grabación en `agente.py`, permitiendo al usuario demostrar una tarea y al agente guardar la secuencia de acciones en `memoria.py` como una nueva habilidad.
 
-### 2.1. Añadir Entrada de Menú en `interactia_gui.py`
-**[COMPLETADO]** Se modificará `interactia_gui.py` para añadir una nueva opción en el menú principal (ej. "Herramientas" o "Configuración") que abrirá la ventana del gestor de consideraciones.
+**Fase 4: Integración y Flujo de Trabajo - [HECHO]**
+- Se orquestó el nuevo flujo de aprendizaje en `agente.py`, integrando la verificación de memoria, la consulta al LLM con confianza, la evaluación de confianza y el diálogo interactivo.
 
-### 2.2. Ventana del Gestor de Consideraciones (`considerations_manager_window.py`)
-**[COMPLETADO]** Se creará un nuevo archivo `considerations_manager_window.py` que contendrá una clase `ConsiderationsManagerWindow` (heredando de `tk.Toplevel`) con la siguiente funcionalidad:
+**Estado Actual:**
+La funcionalidad principal para el aprendizaje interactivo está implementada. El próximo objetivo es abordar la "Verificación de Acciones".
 
-*   **Visualización:** Un `ttk.Treeview` o `tk.Listbox` para mostrar el `nombre` de todas las consideraciones existentes.
-*   **Botones de Acción:**
-    *   "Añadir": Abre un diálogo (`AddEditConsiderationDialog`) para crear una nueva consideración.
-    *   "Editar": Abre un diálogo (`AddEditConsiderationDialog`) con los datos de la consideración seleccionada para su edición.
-    *   "Eliminar": Elimina la consideración seleccionada (con confirmación).
-*   **Diálogo Añadir/Editar (`AddEditConsiderationDialog`):** Una clase `tk.Toplevel` para un formulario simple con campos de entrada para `nombre` y `contenido` de la consideración.
+---
 
-## 3. Integración con el Agente (`agente.py`)
+## Estrategia de Aprendizaje Supervisado Interactivo
 
-### 3.1. Carga de Consideraciones en el Agente
-**[COMPLETADO]** Se modificará la clase `Agente` en `agente.py` para que, al inicializarse o al iniciar un ciclo de tarea, cargue las consideraciones relevantes (posiblemente todas, o filtradas por algún criterio futuro) desde `considerations_db_manager.py`.
+### Fase 1: Detección de Incertidumbre (El Disparador)
+El primer paso es dotar al agente de la capacidad de saber cuándo necesita ayuda.
 
-### 3.2. Actualización del Prompt Maestro
-**[COMPLETADO]** Se modificará `MASTER_PROMPT_TEMPLATE` en `agente.py` para incluir un nuevo campo de contexto que contenga las "Consideraciones Adicionales" cargadas. Esto permitirá al LLM tener acceso a esta información al tomar decisiones.
+*   **Tareas:**
+    1.  **Puntuación de Confianza:** Modificar los prompts al LLM (`comunicador.py`) para que cada acción sugerida incluya una puntuación de confianza (ej. `confidence_score`) y una breve explicación. **[HECHO]**
+    2.  **Análisis de Novedad:** Implementar una función en `agente.py` que, antes de consultar al LLM, verifique en `memoria.py` si existe una tarea similar ya resuelta (una "demostración"). Si la tarea es completamente nueva, se puede reducir el umbral de confianza para pedir ayuda. **[HECHO]**
 
-```
-MASTER_PROMPT_TEMPLATE = """
-...
-INFORMACIÓN DE LA BASE DE CONOCIMIENTO:
-{info_conocimiento}
+### Fase 2: Diálogo y Solicitud de Ayuda (La Interacción)
+Cuando la confianza es baja, el agente debe pausar y pedir ayuda de forma estructurada.
 
-CONSIDERACIONES ADICIONALES:
-{consideraciones_adicionales}
+*   **Tareas:**
+    1.  **Punto de Decisión en `agente.py`:** Crear la lógica principal que compruebe el `confidence_score`. **[HECHO]**
+    2.  **Mecanismo de Pausa y Diálogo:** Implementar un sistema que detenga la ejecución del agente y presente un prompt al usuario en la consola, ofreciendo opciones claras como:
+        - `[P]roceder`: Ejecutar la acción sugerida a pesar de la baja confianza.
+        - `[C]orregir`: Permitir al usuario escribir una instrucción en lenguaje natural para corregir el plan del agente.
+        - `[M]ostrar`: Iniciar el modo de "Aprendizaje por Demostración". **[HECHO]**
 
-TAREA ACTUAL DEL USUARIO: "{user_message}"
-...
-"""
-```
+### Fase 3: Adquisición de Conocimiento (El Aprendizaje)
+Esta es la fase clave donde el agente aprende del usuario.
 
-### 3.3. Lógica de Uso por el LLM
-**[COMPLETADO]** Se confiará en la capacidad del LLM para interpretar y utilizar las `consideraciones_adicionales` proporcionadas en el prompt para mejorar sus decisiones y la ejecución de tareas.
+*   **Tareas:**
+    1.  **Modo de Grabación (Aprendizaje por Demostración):**
+        - Crear un nuevo componente (`grabador.py` o similar) que se active cuando el usuario elige `[M]ostrar`.
+        - Este componente registrará la secuencia de acciones que el usuario realiza a través de la interfaz del agente. **[HECHO]**
+    2.  **Almacenamiento del Conocimiento:**
+        - Una vez que el usuario finaliza la demostración, la secuencia de acciones grabada se guardará en la base de datos de `memoria.py`.
+        - La nueva entrada debe estar asociada con el objetivo o prompt original que inició la tarea, para que pueda ser recuperada en el futuro. **[HECHO]**
 
-## 4. Pasos de Ejecución
+### Fase 4: Integración y Flujo de Trabajo
 
-1.  **[COMPLETADO]** Crear `considerations_db_manager.py` con las funciones CRUD.
-2.  **[COMPLETADO]** Crear `considerations_manager_window.py` con la interfaz de usuario para gestionar las consideraciones.
-3.  **[COMPLETADO]** Modificar `interactia_gui.py` para añadir la opción de menú que abre `ConsiderationsManagerWindow`.
-4.  **[COMPLETADO]** Modificar `agente.py`:
-    *   Importar `considerations_db_manager`.
-    *   Actualizar `__init__` para cargar consideraciones.
-    *   Actualizar `_run_single_cycle` para incluir `consideraciones_adicionales` en el `prompt`.
-    *   Actualizar `MASTER_PROMPT_TEMPLATE` con el nuevo campo.
+*   **Plan de Implementación:**
+    1.  **[HECHO]** Modificar `agente.py` para orquestar el nuevo flujo: `Verificar Memoria -> Consultar LLM (con confianza) -> Evaluar Confianza -> Dialogar/Ejecutar -> Verificar Resultado`.
+    2.  **[HECHO]** Modificar `comunicador.py` para adaptar los prompts del sistema y del usuario para solicitar la puntuación de confianza.
+    3.  **[HECHO]** Desarrollar el sistema de diálogo con el usuario.
+    4.  **[HECHO]** Desarrollar el modo de grabación para el aprendizaje por demostración.
+    5.  **[HECHO]** Adaptar `memoria.py` para almacenar y consultar las "demostraciones" grabadas.
 
-Este plan proporciona una hoja de ruta clara para la implementación de la funcionalidad de "Consideraciones Adicionales".
+---
+
+## Tareas Anteriores (Pendientes y Completadas)
+
+*   **Verificación de Acciones:** El problema original de que el agente no sabe si una acción ha tenido éxito sigue siendo crucial. La verificación post-acción es un paso **obligatorio** después de que el agente (o el usuario) ejecuta una acción. Si la verificación falla, puede ser otro disparador para pedir ayuda. **[HECHO]**
+    *   **Soluciones propuestas:**
+        *   **Análisis de Visión Mejorado:** Comparar capturas de pantalla antes y después de una acción para detectar cambios. **[HECHO]**
+        *   **Esperas Inteligentes:** Reemplazar fixed `sleep` calls with loops that check for a specific condition on the screen with a timeout. **[HECHO]**
+        *   **Máquina de Estados Explícita:** Introduce a state variable in the agent to track task progress (e.g., `waiting_for_window`, `verifying_content`). **[HECHO]**
+        *   **LLM as a Verifier:** Use more structured prompts to have the LLM explicitly verify action outcomes. **[HECHO]**
