@@ -53,7 +53,7 @@ JSON_ACTION_EXAMPLE = """
     "param1": "valor1",
     ...
   },
-  "confidence_score": 0.95, // Puntuación de confianza del 0.0 al 1.0 sobre la idoneidad de la acción.
+  "confidence_score": 0.95, # Puntuación de confianza del 0.0 al 1.0 sobre la idoneidad de la acción.
   "explanation": "Breve explicación de por qué se eligió esta acción."
 }
 """
@@ -91,10 +91,10 @@ Elige la acción más lógica para avanzar hacia la solución de la tarea del us
 EXPECTED_JSON_SCHEMA_DESCRIPTION = """
 El JSON debe tener la siguiente estructura:
 {
-  "accion": "string", // El nombre de la acción a ejecutar
-  "argumentos": { // Un objeto con los argumentos para la acción
+  "accion": "string", # El nombre de la acción a ejecutar
+  "argumentos": { # Un objeto con los argumentos para la acción
     "param1": "valor1",
-    // ... otros parámetros según la acción
+    # ... otros parámetros según la acción
   }
 }
 Asegúrate de que todas las claves y valores de cadena estén entre comillas dobles.
@@ -112,14 +112,44 @@ ANÁLISIS DE LA PANTALLA ACTUAL:
 Responde ÚNICAMENTE con un objeto JSON que contenga:
 - "is_verified": true si la acción fue exitosa, false en caso contrario.
 - "explanation": Una breve explicación de tu decisión.
+- "confidence_score": Un valor flotante entre 0.0 y 1.0 que represente tu confianza en la verificación.
 
 Ejemplo de respuesta JSON:
 ```json
 {{
   "is_verified": true,
-  "explanation": "La ventana esperada se abrió y el texto 'Google' es visible."
+  "explanation": "La ventana esperada se abrió y el texto 'Google' es visible.",
+  "confidence_score": 0.9
 }}
 ```
+"""
+
+LESSON_GENERATION_PROMPT_SUCCESS = """
+La acción "{accion}" con argumentos {argumentos} fue exitosa. El estado actual de la pantalla es:
+{analisis_pantalla}
+
+Basado en este éxito, genera una lección concisa para el futuro. La lección debe ser una regla general o heurística que pueda ayudar a tomar mejores decisiones en situaciones similares.
+
+Responde ÚNICAMENTE con un objeto JSON con las claves "nombre_leccion" y "contenido_leccion".
+Ejemplo:
+{{
+  "nombre_leccion": "Confirmar apertura de Chrome",
+  "contenido_leccion": "Después de ejecutar el comando 'chrome', si la pantalla muestra 'Google', la aplicación se ha abierto correctamente."
+}}
+"""
+
+LESSON_GENERATION_PROMPT_FAILURE = """
+La acción "{accion}" con argumentos {argumentos} falló. El estado actual de la pantalla es:
+{analisis_pantalla}
+
+Basado en este fracaso, genera una lección concisa para el futuro. La lección debe identificar la causa probable del fracaso y sugerir una alternativa o una precaución.
+
+Responde ÚNICAMENTE con un objeto JSON con las claves "nombre_leccion" y "contenido_leccion".
+Ejemplo:
+{{
+  "nombre_leccion": "Alternativa para hacer clic",
+  "contenido_leccion": "Si hacer clic en un botón con coordenadas no funciona, intentar identificar el texto del botón y usarlo como referencia."
+}}
 """
 
 class Agente:
@@ -155,7 +185,7 @@ class Agente:
     def _parsear_respuesta_llm_con_correccion(self, raw_llm_response_text: str, max_retries: int = 3) -> dict:
         current_response_text = raw_llm_response_text
         for retry_count in range(max_retries):
-            self.logger.debug(f"Intento de parseo JSON {retry_count + 1}/{max_retries}: '{current_response_text}'")
+            self.logger.debug(f"Intento de parseo JSON {retry_count + 1}/{max_retries}: '{{current_response_text}}'")
             
             json_str = current_response_text
             # Limpieza: intentar extraer JSON de bloques de markdown o de la cadena completa
@@ -177,8 +207,8 @@ class Agente:
             try:
                 parsed_json = json.loads(json_str)
             except json.JSONDecodeError as e:
-                error_message = f"Error al decodificar JSON estándar: {e}"
-                self.logger.debug(f"{error_message}. Contenido: '{json_str}'")
+                error_message = f"Error al decodificar JSON estándar: {{e}}"
+                self.logger.debug(f"{{error_message}}. Contenido: '{{json_str}}'")
                 
                 # Intento 2: Si falla, intentar parsear como literal de Python y luego convertir a JSON
                 try:
@@ -191,8 +221,8 @@ class Agente:
                     parsed_json = json.loads(json.dumps(python_literal))
                     self.logger.debug("Parseado exitoso como literal de Python y convertido a JSON.")
                 except (SyntaxError, ValueError, TypeError) as e_literal:
-                    error_message = f"Error al decodificar como literal de Python: {e_literal}"
-                    self.logger.debug(f"{error_message}. Contenido: '{json_str}'")
+                    error_message = f"Error al decodificar como literal de Python: {{e_literal}}"
+                    self.logger.debug(f"{{error_message}}. Contenido: '{{json_str}}'")
                     
                     # Intento 3: Heurística de reemplazar comillas simples por dobles y reintentar json.loads
                     try:
@@ -201,8 +231,8 @@ class Agente:
                         parsed_json = json.loads(json.dumps(json_str_fixed_quotes))
                         self.logger.debug("Parseado exitoso con reemplazo de comillas simples.")
                     except json.JSONDecodeError as e_final:
-                        error_message = f"Error final al decodificar JSON con comillas corregidas: {e_final}"
-                        self.logger.warning(f"{error_message}. Contenido: '{json_str_fixed_quotes}'")
+                        error_message = f"Error final al decodificar JSON con comillas corregidas: {{e_final}}"
+                        self.logger.warning(f"{{error_message}}. Contenido: '{{json_str_fixed_quotes}}'")
 
             if parsed_json:
                 # Validar el esquema para la decisión de acción
@@ -223,15 +253,15 @@ class Agente:
                                            isinstance(parsed_json["explanation"], str)
 
                 if is_action_decision or is_verification_response:
-                    self.logger.info(f"JSON parseado y validado exitosamente en intento {retry_count + 1}.")
+                    self.logger.info(f"JSON parseado y validado exitosamente en intento {{retry_count + 1}}.")
                     return parsed_json
                 else:
                     error_message = "El JSON no contiene las claves esperadas para una decisión de acción ('accion', 'argumentos', 'confidence_score', 'explanation') ni para una respuesta de verificación ('is_verified', 'explanation'), o sus tipos/rangos no son válidos."
-                    self.logger.warning(f"Validación de esquema fallida: {error_message}")
+                    self.logger.warning(f"Validación de esquema fallida: {{error_message}}")
             
             # Si llegamos aquí, el parseo o la validación fallaron
             if retry_count < max_retries - 1:
-                self.logger.info(f"Intentando auto-corrección del LLM (intento {retry_count + 1})...")
+                self.logger.info(f"Intentando auto-corrección del LLM (intento {{retry_count + 1}})...")
                 correction_prompt = self._generar_prompt_correccion(current_response_text, error_message)
                 new_llm_response = self.model_provider.generate_content(correction_prompt)
                 current_response_text = new_llm_response if isinstance(new_llm_response, str) else new_llm_response.get('text', str(new_llm_response))
@@ -251,7 +281,7 @@ class Agente:
         Maneja la interacción con el usuario cuando la confianza del LLM es baja.
         Retorna un diccionario con la acción a seguir (ej. {"decision": "proceder"}, {"decision": "corregir", "new_message": "..."})
         """
-        self.comunicador.hablar(f"No estoy muy seguro de cómo proceder con la acción '{accion}'.")
+        self.comunicador.hablar(f"No estoy muy seguro de cómo proceder con la acción '{{accion}}'.")
         self.comunicador.hablar(f"Mi confianza es del {confidence_score:.0%}. Explicación: {explanation}")
         self.comunicador.hablar("¿Qué te gustaría hacer?")
         self.comunicador.hablar("[P]roceder con la acción sugerida")
@@ -355,6 +385,102 @@ class Agente:
             self.logger.error(f"Error al cargar consideraciones adicionales: {e}", exc_info=True)
             return "Error al cargar las consideraciones adicionales."
 
+    def _verify_and_learn(self, accion: str, argumentos: dict, resultado_ejecucion: str):
+        """
+        Verifica el resultado de una acción, pide ayuda si no está seguro y genera una lección aprendida.
+        """
+        self.state = AgentState.VERIFYING_ACTION
+        self.logger.info(f"Verificando la acción '{accion}'...")
+        
+        # 1. Autoverificación con el LLM
+        current_screen_analysis = capture_and_analyze_screen()
+        verification_prompt = VERIFICATION_PROMPT_TEMPLATE.format(
+            accion_previa=accion,
+            argumentos_premios=json.dumps(argumentos),
+            resultado_ejecucion=resultado_ejecucion,
+            analisis_pantalla=current_screen_analysis
+        )
+        verification_response = self._query_llm(verification_prompt)
+        
+        is_verified = verification_response.get("is_verified", False)
+        verification_explanation = verification_response.get("explanation", "No se proporcionó explicación de verificación.")
+        confidence = verification_response.get("confidence_score", 0.0)
+
+        # 2. Verificación Asistida por el Usuario si la confianza es baja
+        final_is_verified = is_verified
+        if confidence < 0.9: # Umbral de confianza para pedir ayuda
+            self.logger.warning(f"Confianza de verificación baja ({confidence:.2f}). Pidiendo confirmación al usuario.")
+            self.comunicador.hablar(f"Creo que la acción '{accion}' {{'tuvo éxito' if is_verified else 'falló'}}.")
+            self.comunicador.hablar(f"Mi razonamiento: {verification_explanation}")
+            
+            while True:
+                user_feedback = input("¿Es esto correcto? (S/N): ").strip().upper()
+                if user_feedback in ['S', 'N']:
+                    user_agrees = (user_feedback == 'S')
+                    if user_agrees != is_verified:
+                        self.logger.info(f"El usuario corrigió la verificación. El resultado real es: {user_agrees}")
+                        final_is_verified = user_agrees
+                        # Registrar la discrepancia para meta-aprendizaje
+                        self.memoria.save_verification_discrepancy(
+                            accion=accion,
+                            argumentos=argumentos,
+                            resultado_ejecucion=resultado_ejecucion,
+                            screen_analysis=current_screen_analysis,
+                            agent_verification=verification_response,
+                            user_correction=final_is_verified
+                        )
+                    else:
+                        self.logger.info("El usuario confirmó la autoverificación.")
+                    break
+                else:
+                    self.comunicador.hablar("Respuesta no válida. Por favor, responde S o N.")
+        
+        # 3. Generar y Guardar Lección Aprendida
+        self._generate_lesson(accion, argumentos, final_is_verified, current_screen_analysis)
+
+        if final_is_verified:
+            self.logger.info(f"Acción '{accion}' verificada exitosamente (confirmado por {{'el agente' if confidence >= 0.9 else 'el usuario'}}).")
+            self.comunicador.hablar(f"Acción '{accion}' verificada.")
+        else:
+            self.logger.warning(f"La acción '{accion}' falló (confirmado por {{'el agente' if confidence >= 0.9 else 'el usuario'}}).")
+            self.comunicador.hablar(f"Advertencia: La acción '{accion}' falló. Intentaré aprender de esto.")
+
+        self.state = AgentState.PLANNING # Volver al estado de planificación para el siguiente ciclo
+
+    def _generate_lesson(self, accion: str, argumentos: dict, fue_exitoso: bool, screen_analysis: str):
+        """Genera una 'consideración' basada en el resultado de una acción y la guarda."""
+        self.logger.info(f"Generando lección para la acción '{accion}' que {{'tuvo éxito' if fue_exitoso else 'falló'}}.")
+
+        # 1. Elegir el prompt adecuado
+        if fue_exitoso:
+            prompt_template = LESSON_GENERATION_PROMPT_SUCCESS
+        else:
+            prompt_template = LESSON_GENERATION_PROMPT_FAILURE
+
+        # 2. Formatear el prompt
+        lesson_prompt = prompt_template.format(
+            accion=accion,
+            argumentos=json.dumps(argumentos),
+            analisis_pantalla=screen_analysis
+        )
+
+        # 3. Llamar al LLM para generar la lección
+        lesson_response = self._query_llm(lesson_prompt)
+
+        # 4. Extraer y guardar la lección
+        lesson_name = lesson_response.get("nombre_leccion")
+        lesson_content = lesson_response.get("contenido_leccion")
+
+        if lesson_name and lesson_content:
+            try:
+                considerations_db_manager.add_consideration(lesson_name, lesson_content)
+                self.logger.info(f"Nueva consideración guardada: '{lesson_name}'")
+                self.comunicador.hablar(f"He aprendido una nueva lección: {lesson_name}")
+            except Exception as e:
+                self.logger.error(f"Error al guardar la consideración: {e}")
+        else:
+            self.logger.warning(f"El LLM no generó una lección válida. Respuesta recibida: {lesson_response}")
+
     def _run_single_cycle(self, user_message: str, session_id: str) -> str:
         if self._stop_requested:
             self.logger.info("Ciclo de agente detenido por solicitud del usuario.")
@@ -453,35 +579,7 @@ class Agente:
             self.logger.info(f"Resultado de la acción '{accion}': {resultado}")
             if accion not in ["responder_chat", "finalizar_tarea", "analizar_pantalla", "consultar_base_conocimiento", "tarea_completada"]:
                  self.comunicador.hablar(f"Acción '{accion}' ejecutada.")
-                 
-                 # --- Verificación de Acciones ---
-                 self.state = AgentState.VERIFYING_ACTION
-                 self.logger.info(f"Verificando la acción '{accion}'...")
-                 current_screen_analysis = capture_and_analyze_screen() # Capturar nueva pantalla para verificación
-
-                 verification_prompt = VERIFICATION_PROMPT_TEMPLATE.format(
-                     accion_previa=accion,
-                     argumentos_premios=json.dumps(argumentos), # Convertir argumentos a string JSON
-                     resultado_ejecucion=resultado,
-                     analisis_pantalla=current_screen_analysis
-                 )
-                 
-                 # Consultar al LLM para la verificación
-                 verification_response = self._query_llm(verification_prompt)
-                 
-                 is_verified = verification_response.get("is_verified", False)
-                 verification_explanation = verification_response.get("explanation", "No se proporcionó explicación de verificación.")
-
-                 if is_verified:
-                     self.logger.info(f"Acción '{accion}' verificada exitosamente. Explicación: {verification_explanation}")
-                     self.comunicador.hablar(f"Acción '{accion}' verificada.")
-                 else:
-                     self.logger.warning(f"La acción '{accion}' NO pudo ser verificada. Explicación: {verification_explanation}")
-                     self.comunicador.hablar(f"Advertencia: La acción '{accion}' no pudo ser verificada. Necesito ayuda.")
-                     # Aquí podríamos añadir lógica para re-planificar o pedir ayuda al usuario
-                     # Por ahora, simplemente se registra la advertencia.
-                 self.state = AgentState.EXECUTING_ACTION # Volver al estado de ejecución para el siguiente ciclo
-                 # --- Fin Verificación de Acciones ---
+                 self._verify_and_learn(accion, argumentos, resultado)
 
         self.memoria.guardar_mensaje(session_id, 'usuario', {'texto': user_message})
         self.memoria.guardar_mensaje(session_id, 'agente', {'accion': accion, 'argumentos': argumentos, 'resultado': resultado})
@@ -492,7 +590,7 @@ class Agente:
     def execute_task(self, initial_user_message: str, session_id: str):
         current_message = initial_user_message
         task_completed = False
-        max_task_cycles = 10 # Prevent infinite loops
+        max_task_cycles = 1 # Prevent infinite loops
         cycle_count = 0
 
         self.state = AgentState.PLANNING # Set initial state to PLANNING

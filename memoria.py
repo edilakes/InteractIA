@@ -27,6 +27,7 @@ class MongoDBChatMemory:
             self.collection_chats = self.db[MONGODB_CHAT_COLLECTION]
             self.kb_collection = self.db[MONGODB_KB_COLLECTION]
             self.skills_collection = self.db["skills_collection"] # Nueva colección para habilidades/demostraciones
+            self.verification_discrepancies_collection = self.db["verification_discrepancies"]
             
             self.operativo = True
             self.logger.info("Memoria conectada a MongoDB.")
@@ -228,6 +229,30 @@ class MongoDBChatMemory:
                 return None
         except Exception as e:
             self.logger.error(f"Error al buscar demostración similar: {e}", exc_info=True)
+            return None
+
+    def save_verification_discrepancy(self, accion: str, argumentos: dict, resultado_ejecucion: str, screen_analysis: str, agent_verification: dict, user_correction: bool):
+        """
+        Guarda una discrepancia entre la autoverificación del agente y la corrección del usuario.
+        """
+        if not self.operativo:
+            self.logger.warning("La memoria no puede guardar discrepancias: no operativa.")
+            return None
+
+        self.logger.info("Guardando discrepancia de verificación...")
+        try:
+            document = {
+                "accion": accion,
+                "argumentos": argumentos,
+                "resultado_ejecucion": resultado_ejecucion,
+                "screen_analysis": screen_analysis,
+                "agent_verification": agent_verification,
+                "user_correction": user_correction,
+                "timestamp": datetime.datetime.now(timezone.utc)
+            }
+            return self.verification_discrepancies_collection.insert_one(document).inserted_id
+        except Exception as e:
+            self.logger.error(f"Error al guardar la discrepancia de verificación: {e}", exc_info=True)
             return None
 
     def _recuperar_historial_crudo(self, session_key: str, limit: int = 50):
