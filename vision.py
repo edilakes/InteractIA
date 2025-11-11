@@ -98,32 +98,38 @@ def check_window_title(title: str) -> bool:
         logging.error(f"Error al verificar título de ventana: {e}", exc_info=True)
         return False
 
-def capture_and_analyze_screen() -> str:
+def capture_and_analyze_screen(screenshot_path: str = None) -> str:
     """
-    Captura la pantalla, la envía a un modelo multimodal para su análisis y
-    devuelve una descripción textual de los elementos presentes.
+    Captura la pantalla o usa una imagen existente, la envía a un modelo multimodal 
+    para su análisis y devuelve una descripción textual de los elementos presentes.
     """
     logging.info("Iniciando captura y análisis de la pantalla...")
 
-    # 1. Captura de pantalla
-    try:
-        screenshot = pyautogui.screenshot()
-        logging.info("Captura de pantalla realizada con éxito.")
-    except Exception as e:
-        logging.error(f"Error al tomar la captura de pantalla: {e}")
-        return "Error: No se pudo capturar la pantalla."
+    image_to_analyze = None
+    if screenshot_path:
+        try:
+            image_to_analyze = Image.open(screenshot_path)
+            logging.info(f"Usando captura de pantalla existente: {screenshot_path}")
+        except FileNotFoundError:
+            logging.error(f"No se encontró el archivo de captura de pantalla: {screenshot_path}")
+            return "Error: No se pudo encontrar el archivo de captura de pantalla."
+    else:
+        try:
+            image_to_analyze = pyautogui.screenshot()
+            logging.info("Captura de pantalla realizada con éxito.")
+        except Exception as e:
+            logging.error(f"Error al tomar la captura de pantalla: {e}")
+            return "Error: No se pudo capturar la pantalla."
 
     # 2. Obtener proveedor del modelo y analizar
     try:
         provider = get_model_provider()
         logging.info(f"Analizando imagen con el proveedor: {provider.provider_type}")
         
-        # Asegurarse de que el modelo seleccionado soporta visión
-        # Esta es una simplificación; una implementación más robusta verificaría las capacidades del modelo.
         if "vision" not in provider.modelo.model_name:
-            logging.warning(f"El modelo por defecto '{provider.modelo.model_name}' podría no ser multimodal. El análisis puede fallar.")
+            logging.warning(f"El modelo por defecto '{provider.modelo.model_name}' podría no ser multimodal.")
 
-        response = provider.generate_content(prompt=VISION_PROMPT, image=screenshot)
+        response = provider.generate_content(prompt=VISION_PROMPT, image=image_to_analyze)
         
         if response and "text" in response:
             description = response["text"]
@@ -138,7 +144,6 @@ def capture_and_analyze_screen() -> str:
         return "Error: Ocurrió un problema al contactar con el modelo de visión."
 
 if __name__ == '__main__':
-    # Pequeña prueba para ejecutar el módulo directamente
     logging.basicConfig(level=logging.INFO)
     description = capture_and_analyze_screen()
     print("--- Descripción de la Pantalla ---")
