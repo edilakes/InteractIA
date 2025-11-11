@@ -54,8 +54,9 @@ JSON_ACTION_EXAMPLE = """
     "param1": "valor1",
     ...
   },
-  "confidence_score": 0.95, # Puntuación de confianza del 0.0 al 1.0 sobre la idoneidad de la acción.
-  "explanation": "Breve explicación de por qué se eligió esta acción."
+  "confidence_score": 0.95,
+  "explanation": "Breve explicación de por qué se eligió esta acción.",
+  "expected_outcome": "Descripción detallada de cómo debería verse la pantalla después de ejecutar la acción. Por ejemplo, 'La calculadora de Windows debería estar abierta y visible en la pantalla'."
 }
 """
 
@@ -74,28 +75,25 @@ ACCIONES DISPONIBLES:
 - `buscar_en_google(termino_busqueda)`: Realiza una búsqueda en Google.
 
 **Acciones Internas:**
-- `responder_chat(mensaje)`: Envía un mensaje al usuario. **Úsala cuando necesites una aclaración del usuario o para informarle sobre el progreso, pero no para finalizar la tarea.**
+- `responder_chat(mensaje)`: Envía un mensaje al usuario.
 - `analizar_pantalla()`: Realiza un análisis del entorno visual y actualiza el contexto.
 - `consultar_base_conocimiento(termino_busqueda)`: Busca en la base de conocimiento y actualiza el contexto.
-- `finalizar_tarea(mensaje_final)`: Indica que la tarea ha sido completada. **Úsala solo cuando la tarea del usuario esté 100% resuelta y no haya más pasos pendientes. Proporciona un mensaje claro de finalización.**
-- `tarea_completada()`: **Úsala cuando la tarea del usuario haya sido resuelta y no necesites enviar un mensaje específico al usuario, simplemente para indicar que has terminado.**
+- `finalizar_tarea(mensaje_final)`: Indica que la tarea ha sido completada.
+- `tarea_completada()`: Indica que la tarea ha sido resuelta.
 
-Elige la acción más lógica para avanzar hacia la solución de la tarea del usuario. Si la tarea requiere múltiples pasos, elige la siguiente acción necesaria. No finalices la tarea prematuramente.
-
-**Consideraciones Adicionales:**
-- Si la petición del usuario es una tarea simple y atómica (ej. "abre google.com", "escribe hola"), y has ejecutado la acción que la cumple directamente, DEBES usar `tarea_completada()` inmediatamente después de la ejecución exitosa de esa acción. No esperes a más ciclos ni intentes acciones adicionales a menos que el usuario lo solicite explícitamente.
-- Usa `finalizar_tarea(mensaje_final)` si necesitas proporcionar un resumen o una confirmación explícita al usuario de que la tarea compleja ha sido resuelta.
-- Usa `responder_chat(mensaje)` solo para aclaraciones o para informar sobre el progreso de una tarea multi-paso, no para finalizar la tarea.
+Elige la acción más lógica para avanzar hacia la solución de la tarea del usuario.
 """
 
 EXPECTED_JSON_SCHEMA_DESCRIPTION = """
 El JSON debe tener la siguiente estructura:
 {
-  "accion": "string", # El nombre de la acción a ejecutar
-  "argumentos": { # Un objeto con los argumentos para la acción
+  "accion": "string",
+  "argumentos": {
     "param1": "valor1",
-    # ... otros parámetros según la acción
-  }
+  },
+  "confidence_score": float,
+  "explanation": "string",
+  "expected_outcome": "string"
 }
 Asegúrate de que todas las claves y valores de cadena estén entre comillas dobles.
 """
@@ -103,29 +101,15 @@ Asegúrate de que todas las claves y valores de cadena estén entre comillas dob
 LESSON_GENERATION_PROMPT_SUCCESS = """
 La acción "{accion}" con argumentos {argumentos} fue exitosa. El estado actual de la pantalla es:
 {analisis_pantalla}
-
-Basado en este éxito, genera una lección concisa para el futuro. La lección debe ser una regla general o heurística que pueda ayudar a tomar mejores decisiones en situaciones similares.
-
+Basado en este éxito, genera una lección concisa para el futuro.
 Responde ÚNICAMENTE con un objeto JSON con las claves "nombre_leccion" y "contenido_leccion".
-Ejemplo:
-{{
-  "nombre_leccion": "Confirmar apertura de Chrome",
-  "contenido_leccion": "Después de ejecutar el comando 'chrome', si la pantalla muestra 'Google', la aplicación se ha abierto correctamente."
-}}
 """
 
 LESSON_GENERATION_PROMPT_FAILURE = """
 La acción "{accion}" con argumentos {argumentos} falló. El estado actual de la pantalla es:
 {analisis_pantalla}
-
-Basado en este fracaso, genera una lección concisa para el futuro. La lección debe identificar la causa probable del fracaso y sugerir una alternativa o una precaución.
-
+Basado en este fracaso, genera una lección concisa para el futuro.
 Responde ÚNICAMENTE con un objeto JSON con las claves "nombre_leccion" y "contenido_leccion".
-Ejemplo:
-{{
-  "nombre_leccion": "Alternativa para hacer clic",
-  "contenido_leccion": "Si hacer clic en un botón con coordenadas no funciona, intentar identificar el texto del botón y usarlo como referencia."
-}}
 """
 
 class Agente:
@@ -144,7 +128,7 @@ class Agente:
         self.vision_analysis = "No se ha realizado ningún análisis de pantalla aún."
         self.kb_info = "No se ha consultado la base de conocimiento aún."
         self._stop_requested = False
-        self.state = AgentState.IDLE # Inicializar el estado del agente
+        self.state = AgentState.IDLE
 
     def request_stop(self):
         self.logger.info("Solicitud de detención recibida.")
@@ -169,97 +153,51 @@ class Agente:
             self.logger.debug(f"Intento de parseo JSON {retry_count + 1}/{max_retries}: '{{current_response_text}}'")
             
             json_str = current_response_text
-            # Limpieza: intentar extraer JSON de bloques de markdown o de la cadena completa
             match = re.search(r'```json\s*(\{.*?\})\s*```', json_str, re.DOTALL)
             if match:
                 json_str = match.group(1)
             else:
-                # Intentar encontrar el JSON más externo si no hay bloque markdown
                 start = json_str.find('{')
                 end = json_str.rfind('}')
                 if start != -1 and end != -1 and start < end:
                     json_str = json_str[start:end+1]
-                # Si no se encuentra un bloque JSON claro, se asume que toda la respuesta es el JSON
             
             parsed_json = None
             error_message = ""
 
-            # Intento 1: Reemplazar comillas simples en claves por dobles y luego parsear como JSON estándar
-            # Esto es para manejar casos como {'key': 'value'} -> {"key": 'value'}
-try:
-                # Usar una regex para reemplazar solo las comillas simples alrededor de las claves
-                # y luego intentar cargar el JSON.
-                # Esto es un enfoque heurístico y podría no ser perfecto para todos los casos.
+            try:
                 json_str_fixed_keys = re.sub(r"([{,]\s*)\'([^']+?)\'", r"\1\"\2\"", json_str)
                 parsed_json = json.loads(json_str_fixed_keys)
-                self.logger.debug(f"Parseado exitoso con reemplazo heurístico de comillas simples en claves. Contenido: '{{json_str_fixed_keys}}'")
             except json.JSONDecodeError as e:
-                error_message = f"Error al decodificar JSON estándar después de arreglar claves: {{e}}"
-                self.logger.debug(f"{{error_message}}. Contenido: '{{json_str_fixed_keys}}'")
+                error_message = f"Error al decodificar JSON: {{e}}"
 
-            if not parsed_json: # Si el primer intento falló, probar los siguientes
-                # Intento 2: Parsear como JSON estándar (original)
+            if not parsed_json:
                 try:
                     parsed_json = json.loads(json_str)
                 except json.JSONDecodeError as e:
-                    error_message = f"Error al decodificar JSON estándar: {{e}}"
-                    self.logger.debug(f"{{error_message}}. Contenido: '{{json_str}}'")
-                    
-                    # Intento 3: Si falla, intentar parsear como literal de Python y luego convertir a JSON
+                    error_message = f"Error al decodificar JSON: {{e}}"
                     try:
-                        # Esto es crucial para manejar las respuestas del LLM que a veces usan \n
                         cleaned_json_str = json_str.replace('\\n', '\n')
                         python_literal = ast.literal_eval(cleaned_json_str)
-                        # Convertir el literal de Python a una cadena JSON válida
                         parsed_json = json.loads(json.dumps(python_literal))
-                        self.logger.debug("Parseado exitoso como literal de Python y convertido a JSON.")
                     except (SyntaxError, ValueError, TypeError) as e_literal:
                         error_message = f"Error al decodificar como literal de Python: {{e_literal}}"
-                        self.logger.debug(f"{{error_message}}. Contenido: '{{json_str}}'")
-                        
-                        # Intento 4: Heurística de reemplazar TODAS las comillas simples por dobles y reintentar json.loads
                         try:
-                            # Solo aplicar esta heurística si los intentos anteriores fallaron
                             json_str_fixed_quotes = json_str.replace("'", '"')
-                            parsed_json = json.loads(json_str_fixed_quotes) # Corregido aquí
-                            self.logger.debug("Parseado exitoso con reemplazo de comillas simples.")
+                            parsed_json = json.loads(json_str_fixed_quotes)
                         except json.JSONDecodeError as e_final:
-                            error_message = f"Error final al decodificar JSON con comillas corregidas: {{e_final}}"
-                            self.logger.warning(f"{{error_message}}. Contenido: '{{json_str_fixed_quotes}}'")
+                            error_message = f"Error final al decodificar JSON: {{e_final}}"
 
             if parsed_json:
-                # Validar el esquema para la decisión de acción
-                is_action_decision = isinstance(parsed_json, dict) and \
-                                     "accion" in parsed_json and \
-                                     "argumentos" in parsed_json and \
-                                     "confidence_score" in parsed_json and \
-                                     "explanation" in parsed_json and \
-                                     isinstance(parsed_json["confidence_score"], (int, float)) and \
-                                     0.0 <= parsed_json["confidence_score"] <= 1.0 and \
-                                     isinstance(parsed_json["explanation"], str)
-                
-                # Validar el esquema para la verificación de acción
-                is_verification_response = isinstance(parsed_json, dict) and \
-                                           "is_verified" in parsed_json and \
-                                           "explanation" in parsed_json and \
-                                           isinstance(parsed_json["is_verified"], bool) and \
-                                           isinstance(parsed_json["explanation"], str)
-                
-                # Validar el esquema para la generación de lecciones
-                is_lesson_response = isinstance(parsed_json, dict) and \
-                                     "nombre_leccion" in parsed_json and \
-                                     "contenido_leccion" in parsed_json and \
-                                     isinstance(parsed_json["nombre_leccion"], str) and \
-                                     isinstance(parsed_json["contenido_leccion"], str)
+                is_action_decision = isinstance(parsed_json, dict) and "accion" in parsed_json and "argumentos" in parsed_json and "expected_outcome" in parsed_json
+                is_lesson_response = isinstance(parsed_json, dict) and "nombre_leccion" in parsed_json and "contenido_leccion" in parsed_json
 
-                if is_action_decision or is_verification_response or is_lesson_response:
+                if is_action_decision or is_lesson_response:
                     self.logger.info(f"JSON parseado y validado exitosamente en intento {{retry_count + 1}}.")
                     return parsed_json
                 else:
-                    error_message = "El JSON no contiene las claves esperadas para una decisión de acción ('accion', 'argumentos', 'confidence_score', 'explanation') ni para una respuesta de verificación ('is_verified', 'explanation'), o sus tipos/rangos no son válidos."
-                    self.logger.warning(f"Validación de esquema fallida: {{error_message}}")
+                    error_message = "El JSON no contiene las claves esperadas."
             
-            # Si llegamos aquí, el parseo o la validación fallaron
             if retry_count < max_retries - 1:
                 self.logger.info(f"Intentando auto-corrección del LLM (intento {{retry_count + 1}})...")
                 correction_prompt = self._generar_prompt_correccion(current_response_text, error_message)
@@ -267,61 +205,41 @@ try:
                 current_response_text = new_llm_response if isinstance(new_llm_response, str) else new_llm_response.get('text', str(new_llm_response))
                 if not current_response_text:
                     self.logger.error("El LLM devolvió una respuesta vacía durante la corrección.")
-                    break # Salir del bucle si la corrección es vacía
+                    break
             else:
-                self.logger.error(f"Falló el parseo JSON después de {max_retries} intentos. Último error: {error_message}")
-                # Retornar una acción de error si todos los reintentos fallan
-                return {"accion": "responder_chat", "argumentos": {"mensaje": f"Error interno: no pude procesar la decisión del modelo después de {max_retries} intentos. ({error_message})"}}
+                self.logger.error(f"Falló el parseo JSON después de {max_retries} intentos. Último error: {{error_message}}")
+                return {"accion": "responder_chat", "argumentos": {"mensaje": f"Error interno: no pude procesar la decisión del modelo después de {max_retries} intentos. ({{error_message}})"}}
         
-        # Esto solo se alcanzará si el bucle termina sin éxito y sin retornar en el último intento
         return {"accion": "responder_chat", "argumentos": {"mensaje": f"Error interno desconocido durante el parseo de la respuesta del modelo."}}
 
     def _handle_low_confidence_interaction(self, accion: str, argumentos: dict, confidence_score: float, explanation: str, user_message: str) -> dict:
-        """
-        Maneja la interacción con el usuario cuando la confianza del LLM es baja.
-        Retorna un diccionario con la acción a seguir (ej. {"decision": "proceder"}, {"decision": "corregir", "new_message": "..."})
-        """
         self.comunicador.hablar(f"No estoy muy seguro de cómo proceder con la acción '{{accion}}'.")
-        self.comunicador.hablar(f"Mi confianza es del {confidence_score:.0%}. Explicación: {explanation}")
+        self.comunicador.hablar(f"Mi confianza es del {confidence_score:.0%}. Explicación: {{explanation}}")
         self.comunicador.hablar("¿Qué te gustaría hacer?")
-        self.comunicador.hablar("[P]roceder con la acción sugerida")
-        self.comunicador.hablar("[C]orregir el plan con nuevas instrucciones")
-        self.comunicador.hablar("[M]ostrarme cómo hacerlo (modo de demostración)")
+        self.comunicador.hablar("[P]roceder, [C]orregir, [M]ostrarme")
 
         while True:
             user_choice = input("Tu elección (P/C/M): ").strip().upper()
             if user_choice == 'P':
-                self.comunicador.hablar("Procediendo con la acción sugerida.")
                 return {"decision": "proceder"}
             elif user_choice == 'C':
-                new_instructions = input("Por favor, introduce tus nuevas instrucciones para corregir el plan: ").strip()
+                new_instructions = input("Nuevas instrucciones: ").strip()
                 if new_instructions:
-                    self.comunicador.hablar("Instrucciones recibidas. Re-evaluando el plan.")
                     return {"decision": "corregir", "new_message": new_instructions}
-                else:
-                    self.comunicador.hablar("No se proporcionaron nuevas instrucciones. Por favor, elige de nuevo.")
             elif user_choice == 'M':
-                self.comunicador.hablar("Entrando en modo de demostración. Por favor, realiza la tarea.")
                 return {"decision": "demostrar"}
-            else:
-                self.comunicador.hablar("Opción no válida. Por favor, elige P, C o M.")
 
     def _query_llm(self, prompt: str) -> dict:
         self.logger.info("Enviando petición al modelo de IA...")
         try:
             respuesta_bruta = self.model_provider.generate_content(prompt)
-            self.logger.debug(f"Respuesta BRUTA del modelo: '{{respuesta_bruta}}'")
-            
             texto_para_parsear = respuesta_bruta if isinstance(respuesta_bruta, str) else respuesta_bruta.get('text', str(respuesta_bruta))
-            
             if not texto_para_parsear:
                 raise ValueError("La respuesta del modelo está vacía.")
-
             return self._parsear_respuesta_llm_con_correccion(texto_para_parsear)
-
         except Exception as e:
             self.logger.error(f"ERROR al llamar al proveedor del modelo de IA: {{e}}", exc_info=True)
-            return {"accion": "responder_chat", "argumentos": {"mensaje": f"Error interno: no pude contactar con el modelo de IA. ({{e}})"}}
+            return {"accion": "responder_chat", "argumentos": {"mensaje": f"Error interno: no pude contactar con el modelo de IA."}}
 
     def _ejecutar_accion_primitiva(self, accion: str, args: dict):
         self.logger.info(f"Ejecutando acción primitiva: {accion} con args: {args}")
@@ -339,161 +257,98 @@ try:
         self.logger.info(f"Ejecutando acción compuesta: {accion} con args: {args}")
         if accion == "navegar_a_url":
             url = args.get("url")
-            if not url:
-                return "Error: La URL no fue proporcionada para navegar."
             self.controlador.presionar_tecla("win+r")
-            # self.controlador.esperar(1) # Reemplazado por espera inteligente
-            wait_for_condition("window_open", "Google Chrome", timeout=5) # Espera hasta 5 segundos a que se abra Chrome
+            wait_for_condition("window_open", "Google Chrome", timeout=5)
             self.controlador.escribir("chrome")
             self.controlador.presionar_tecla("enter")
-            # self.controlador.esperar(2) # Reemplazado por espera inteligente
-            wait_for_condition("window_open", "Google Chrome", timeout=5) # Espera hasta 5 segundos a que se abra Chrome
+            wait_for_condition("window_open", "Google Chrome", timeout=5)
             self.controlador.escribir(url)
             self.controlador.presionar_tecla("enter")
             return f"Navegación a {url} completada."
-        
         elif accion == "buscar_en_google":
             termino = args.get("termino_busqueda")
-            if not termino:
-                return "Error: El término de búsqueda no fue proporcionado."
             self.controlador.presionar_tecla("win+r")
-            # self.controlador.esperar(1) # Reemplazado por espera inteligente
-            wait_for_condition("window_open", "Google Chrome", timeout=5) # Espera hasta 5 segundos a que se abra Chrome
+            wait_for_condition("window_open", "Google Chrome", timeout=5)
             self.controlador.escribir("chrome")
             self.controlador.presionar_tecla("enter")
-            # self.controlador.esperar(2) # Reemplazado por espera inteligente
-            wait_for_condition("window_open", "Google Chrome", timeout=5) # Espera hasta 5 segundos a que se abra Chrome
-            self.controlador.escribir(f"https://www.google.com/search?q={{termino.replace(' ', '+')}}")
+            wait_for_condition("window_open", "Google Chrome", timeout=5)
+            self.controlador.escribir(f"https://www.google.com/search?q={termino.replace(' ', '+')}")
             self.controlador.presionar_tecla("enter")
             return f"Búsqueda de '{termino}' en Google completada."
-            
-        return None # Indica que no es una acción compuesta conocida
+        return None
 
     def _load_additional_considerations(self) -> str:
-        """Carga las consideraciones adicionales desde la base de datos y las formatea."""
         try:
             considerations = considerations_db_manager.get_all_considerations()
             if not considerations:
                 return "No hay consideraciones adicionales."
-            
-            formatted_considerations = []
-            for cons in considerations:
-                formatted_considerations.append(f"- {{cons['nombre']}}: {{cons['contenido']}}")
-            
-            return "\n".join(formatted_considerations)
+            return "\n".join([f"- {c['nombre']}: {c['contenido']}" for c in considerations])
         except Exception as e:
             self.logger.error(f"Error al cargar consideraciones adicionales: {{e}}", exc_info=True)
             return "Error al cargar las consideraciones adicionales."
 
-    def _verify_and_learn(self, accion: str, argumentos: dict, pre_screenshot: str, pre_mouse_pos: dict):
-        """
-        Verifica el resultado de una acción, pide ayuda si no está seguro y genera una lección aprendida.
-        """
+    def _verify_and_learn(self, accion: str, argumentos: dict, pre_screenshot: str, pre_mouse_pos: dict, expected_outcome: str):
         self.state = AgentState.VERIFYING_ACTION
         self.logger.info(f"Verificando la acción '{accion}'...")
         
-        # 1. Autoverificación con el LLM
-        post_screenshot = self.controlador.capturar_pantalla() # Capturar pantalla DESPUÉS de la acción
+        post_screenshot = self.controlador.capturar_pantalla()
         
-        # Usar el verificador para obtener la verificación
-        argumentos_verificacion = argumentos.copy()
-        if accion == "escribir":
-            argumentos_verificacion['mouse_pos'] = pre_mouse_pos
-
-        verification_result = self.verificador.verificar_accion(accion, argumentos_verificacion, pre_screenshot, post_screenshot)
+        verification_result = self.verificador.verificar_accion(
+            accion, 
+            argumentos, 
+            pre_screenshot, 
+            post_screenshot, 
+            expected_outcome=expected_outcome,
+            mouse_pos=pre_mouse_pos
+        )
         
         is_verified = verification_result.get("verificado", False)
         confidence = verification_result.get("confianza", 0.0)
         explanation = verification_result.get("razon", "No se proporcionó explicación.")
 
-        # 2. Verificación Asistida por el Usuario si la confianza es baja
-        final_is_verified = is_verified
-        if confidence < 0.9: # Umbral de confianza para pedir ayuda
+        if confidence < 0.9:
             self.logger.warning(f"Confianza de verificación baja ({{confidence:.2f}}). Pidiendo confirmación al usuario.")
-            self.comunicador.hablar(f"Creo que la acción '{accion}' {{'tuvo éxito' if is_verified else 'falló'}}.")
-            self.comunicador.hablar(f"Mi razonamiento: {explanation}")
-            
-            while True:
-                user_feedback = input("¿Es esto correcto? (S/N): ").strip().upper()
-                if user_feedback in ['S', 'N']:
-                    user_agrees = (user_feedback == 'S')
-                    if user_agrees != is_verified:
-                        self.logger.info(f"El usuario corrigió la verificación. El resultado real es: {{user_agrees}}")
-                        final_is_verified = user_agrees
-                        # Aquí se podría registrar la discrepancia para meta-aprendizaje
-                    else:
-                        self.logger.info("El usuario confirmó la autoverificación.")
-                    break
-                else:
-                    self.comunicador.hablar("Respuesta no válida. Por favor, responde S o N.")
-        
-        # 3. Generar y Guardar Lección Aprendida
+            self.comunicador.hablar(f"Creo que la acción '{accion}' {{'tuvo éxito' if is_verified else 'falló'}}. Razón: {{explanation}}")
+            user_feedback = input("¿Es esto correcto? (S/N): ").strip().upper()
+            if user_feedback == 'S':
+                final_is_verified = is_verified
+            else:
+                final_is_verified = not is_verified
+        else:
+            final_is_verified = is_verified
+
         self._generate_lesson(accion, argumentos, final_is_verified, post_screenshot)
 
         if final_is_verified:
-            self.logger.info(f"Acción '{accion}' verificada exitosamente (confirmado por {{'el agente' if confidence >= 0.9 else 'el usuario'}}).")
-            self.comunicador.hablar(f"Acción '{accion}' verificada.")
+            self.logger.info(f"Acción '{accion}' verificada exitosamente.")
         else:
-            self.logger.warning(f"La acción '{accion}' falló (confirmado por {{'el agente' if confidence >= 0.9 else 'el usuario'}}).")
-            self.comunicador.hablar(f"Advertencia: La acción '{accion}' falló. Intentaré aprender de esto.")
+            self.logger.warning(f"La acción '{accion}' falló.")
 
-        self.state = AgentState.PLANNING # Volver al estado de planificación para el siguiente ciclo
+        self.state = AgentState.PLANNING
 
     def _generate_lesson(self, accion: str, argumentos: dict, fue_exitoso: bool, screen_analysis: str):
-        """Genera una 'consideración' basada en el resultado de una acción y la guarda."""
         self.logger.info(f"Generando lección para la acción '{accion}' que {{'tuvo éxito' if fue_exitoso else 'falló'}}.")
-
-        # 1. Elegir el prompt adecuado
-        if fue_exitoso:
-            prompt_template = LESSON_GENERATION_PROMPT_SUCCESS
-        else:
-            prompt_template = LESSON_GENERATION_PROMPT_FAILURE
-
-        # 2. Formatear el prompt
-        lesson_prompt = prompt_template.format(
-            accion=accion,
-            argumentos=json.dumps(argumentos),
-            analisis_pantalla=screen_analysis
-        )
-
-        # 3. Llamar al LLM para generar la lección
+        prompt_template = LESSON_GENERATION_PROMPT_SUCCESS if fue_exitoso else LESSON_GENERATION_PROMPT_FAILURE
+        lesson_prompt = prompt_template.format(accion=accion, argumentos=json.dumps(argumentos), analisis_pantalla=screen_analysis)
         lesson_response = self._query_llm(lesson_prompt)
-
-        # 4. Extraer y guardar la lección
         lesson_name = lesson_response.get("nombre_leccion")
         lesson_content = lesson_response.get("contenido_leccion")
-
         if lesson_name and lesson_content:
             try:
                 considerations_db_manager.add_consideration(lesson_name, lesson_content)
                 self.logger.info(f"Nueva consideración guardada: '{lesson_name}'")
-                self.comunicador.hablar(f"He aprendido una nueva lección: {lesson_name}")
             except Exception as e:
                 self.logger.error(f"Error al guardar la consideración: {{e}}")
-        else:
-            self.logger.warning(f"El LLM no generó una lección válida. Respuesta recibida: {{lesson_response}}")
 
     def _run_single_cycle(self, user_message: str, session_id: str) -> str:
         if self._stop_requested:
-            self.logger.info("Ciclo de agente detenido por solicitud del usuario.")
             return "stopped"
         self.logger.info(f"--- Iniciando ciclo para mensaje: '{user_message}' ---")
 
-        # 1. Recopilar contexto
         historial_raw = self.memoria._recuperar_historial_crudo(session_id)
         historial_chat = self.memoria.convertir_historial_a_formato_simple(historial_raw)
         additional_considerations = self._load_additional_considerations()
         
-        # 1.1. Análisis de Novedad: Buscar demostraciones similares
-        similar_demonstration = self.memoria.find_similar_demonstration(user_message)
-        if similar_demonstration:
-            self.logger.info(f"Se encontró una demostración similar para la tarea: '{similar_demonstration['task_description']}' con score: {similar_demonstration['score']}.")
-            # Aquí podríamos decidir ejecutar la demostración directamente o usarla para enriquecer el prompt del LLM
-            # Por ahora, solo registramos que se encontró.
-        else:
-            self.logger.info("No se encontraron demostraciones similares para esta tarea. Podría ser una tarea nueva.")
-
-        # 2. Construir el prompt
         prompt = MASTER_PROMPT_TEMPLATE.format(
             historial_chat="\n".join([f"{msg['rol']}: {msg['contenido']}" for msg in historial_chat]),
             analisis_pantalla=self.vision_analysis,
@@ -504,144 +359,92 @@ try:
         prompt += JSON_ACTION_EXAMPLE
         prompt += MASTER_PROMPT_ACTIONS
 
-        # 3. Consultar al LLM
         decision_json = self._query_llm(prompt)
         accion = decision_json.get("accion")
         argumentos = decision_json.get("argumentos", {})
-        confidence_score = decision_json.get("confidence_score", 0.0) # Default a 0.0 si no está presente
+        confidence_score = decision_json.get("confidence_score", 0.0)
         explanation = decision_json.get("explanation", "No se proporcionó explicación.")
+        expected_outcome = decision_json.get("expected_outcome", "No se proporcionó una descripción del resultado esperado.")
         
         self.logger.info(f"Acción decidida por el LLM: {accion} (Confianza: {confidence_score:.2f})")
-        self.logger.debug(f"Explicación del LLM: {explanation}")
 
-        # --- Punto de Decisión para solicitar ayuda ---
-        if confidence_score < 0.8: # Umbral configurable
-            self.logger.warning(f"Baja confianza ({{confidence_score:.2f}}) en la acción '{accion}'. Solicitando ayuda al usuario.")
-            
+        if confidence_score < 0.8:
             interaction_result = self._handle_low_confidence_interaction(accion, argumentos, confidence_score, explanation, user_message)
-
-            if interaction_result["decision"] == "proceder":
-                self.comunicador.hablar("Procediendo con la acción sugerida.")
-                # Continuar con la ejecución de la acción decidida por el LLM
-            elif interaction_result["decision"] == "corregir":
-                new_user_message = interaction_result["new_message"]
-                self.comunicador.hablar(f"Usuario corrigió el plan. Re-consultando al LLM con: '{new_user_message}'")
-                # Guardar el mensaje de corrección del usuario en el historial
-                self.memoria.guardar_mensaje(session_id, 'usuario', {'texto': new_user_message})
-                # Re-ejecutar el ciclo con el nuevo mensaje del usuario
-                return self._run_single_cycle(new_user_message, session_id) # Esto reinicia el ciclo con el nuevo mensaje
+            if interaction_result["decision"] == "corregir":
+                return self._run_single_cycle(interaction_result["new_message"], session_id)
             elif interaction_result["decision"] == "demostrar":
-                self.comunicador.hablar("El usuario ha solicitado entrar en modo de demostración.")
-                # Devolver una acción especial para que el bucle principal la maneje
-                return "demostrar_accion" 
-        # --- Fin del Punto de Decisión ---
+                return "demostrar_accion"
 
         if not accion:
             resultado = "El modelo no especificó una acción a realizar."
-            self.comunicador.hablar(resultado)
         else:
-            pre_screenshot = self.controlador.capturar_pantalla() # Capturar pantalla ANTES de ejecutar la acción
+            pre_screenshot = self.controlador.capturar_pantalla()
             pre_mouse_pos = self.controlador.obtener_posicion_raton()
             resultado = self._ejecutar_accion_compuesta(accion, argumentos)
             
-            if resultado is None: # No era una acción compuesta
-                # Intentar como acción interna o primitiva
+            if resultado is None:
                 if accion == "responder_chat":
-                    self.comunicador.hablar(argumentos.get("mensaje", "No tengo nada que decir."))
-                    resultado = "Mensaje enviado al usuario."
+                    self.comunicador.hablar(argumentos.get("mensaje", ""))
+                    resultado = "Mensaje enviado."
                 elif accion == "finalizar_tarea":
-                    self.comunicador.hablar(f"Tarea finalizada: {argumentos.get('mensaje_final', 'Completado.')}")
-                    resultado = "Tarea marcada como finalizada."
+                    self.comunicador.hablar(argumentos.get('mensaje_final', 'Completado.'))
+                    resultado = "Tarea finalizada."
                 elif accion == "analizar_pantalla":
                     self.vision_analysis = capture_and_analyze_screen()
-                    self.comunicador.hablar("Análisis de pantalla realizado y contexto actualizado.")
                     resultado = "Análisis de pantalla completado."
                 elif accion == "consultar_base_conocimiento":
                     termino = argumentos.get("termino_busqueda")
-                    if termino:
-                        self.kb_info = self.memoria.query_base_conocimiento(termino)
-                        self.comunicador.hablar("Consulta a la base de conocimiento realizada y contexto actualizado.")
-                        resultado = "Consulta a la KB completada."
-                    else:
-                        resultado = "Error: No se proporcionó término de búsqueda para la KB."
+                    self.kb_info = self.memoria.query_base_conocimiento(termino)
+                    resultado = "Consulta a la KB completada."
                 elif accion == "tarea_completada":
-                    self.comunicador.hablar("Tarea completada.")
-                    resultado = "Tarea marcada como completada."
+                    resultado = "Tarea completada."
                 else:
                     resultado = self._ejecutar_accion_primitiva(accion, argumentos)
             
             self.logger.info(f"Resultado de la acción '{accion}': {resultado}")
             if accion not in ["responder_chat", "finalizar_tarea", "analizar_pantalla", "consultar_base_conocimiento", "tarea_completada"]:
-                 self.comunicador.hablar(f"Acción '{accion}' ejecutada.")
-                 self._verify_and_learn(accion, argumentos, pre_screenshot, pre_mouse_pos)
+                 self._verify_and_learn(accion, argumentos, pre_screenshot, pre_mouse_pos, expected_outcome)
 
         self.memoria.guardar_mensaje(session_id, 'usuario', {'texto': user_message})
         self.memoria.guardar_mensaje(session_id, 'agente', {'accion': accion, 'argumentos': argumentos, 'resultado': resultado})
 
-        self.logger.info("--- Fin del ciclo ---")
-        return accion # Return the action taken
+        return accion
 
     def execute_task(self, initial_user_message: str, session_id: str):
         current_message = initial_user_message
         task_completed = False
-        max_task_cycles = 1 # Prevent infinite loops
+        max_task_cycles = 1
         cycle_count = 0
 
-        self.state = AgentState.PLANNING # Set initial state to PLANNING
+        self.state = AgentState.PLANNING
 
         while not task_completed and cycle_count < max_task_cycles and not self._stop_requested:
             cycle_count += 1
-            self.logger.info(f"--- Ejecutando ciclo de tarea {cycle_count}/{max_task_cycles} ---")
-            
-            self.state = AgentState.EXECUTING_ACTION # Set state to EXECUTING_ACTION before each cycle
-            # Execute a single cycle of the agent
+            self.state = AgentState.EXECUTING_ACTION
             accion_ejecutada = self._run_single_cycle(current_message, session_id)
 
-            # Determine if the task is completed based on the action executed
             if self._stop_requested:
                 task_completed = True
-                self.logger.info("Tarea detenida por solicitud del usuario.")
-                self.state = AgentState.TASK_FAILED # Task failed due to stop request
+                self.state = AgentState.TASK_FAILED
             elif accion_ejecutada == "demostrar_accion":
-                self.state = AgentState.DEMONSTRATING # Set state to DEMONSTRATING
-                self.comunicador.hablar("¡Entendido! Por favor, realiza la tarea ahora. Todas tus acciones serán grabadas.")
-                self.comunicador.hablar("Cuando hayas terminado la demostración, presiona ENTER en esta consola.")
-                
+                self.state = AgentState.DEMONSTRATING
                 grabador.start_recording()
-                input("Presiona ENTER para finalizar la demostración y que el agente aprenda...") # Espera la señal del usuario
+                input("Presiona ENTER para finalizar la demostración...")
                 recorded_steps = grabador.stop_recording()
-
                 if recorded_steps:
                     self.memoria.save_demonstration(initial_user_message, recorded_steps)
-                    self.comunicador.hablar(f"¡Demostración grabada y guardada como una nueva habilidad para la tarea '{initial_user_message}'!")
-                else:
-                    self.comunicador.hablar("No se grabaron acciones durante la demostración.")
-                
-                task_completed = True # La tarea se considera completada después de la demostración
-                self.logger.info("Modo de demostración finalizado y tarea completada.")
-                self.state = AgentState.TASK_COMPLETED # Demonstration completed, task considered completed
+                task_completed = True
+                self.state = AgentState.TASK_COMPLETED
             elif accion_ejecutada in ["responder_chat", "finalizar_tarea", "tarea_completada"]:
                 task_completed = True
-                self.logger.info(f"Tarea finalizada por acción: {accion_ejecutada}")
-                self.state = AgentState.TASK_COMPLETED # Task completed successfully
+                self.state = AgentState.TASK_COMPLETED
             else:
-                # For multi-step tasks, the agent needs to decide the next step.
-                # The 'current_message' for the next cycle should reflect the ongoing task.
-                # For now, we'll keep it as the initial message, but this might need refinement
-                # if the LLM needs to be prompted with updated context for the *next* step.
-                # A more advanced approach would be to have the LLM generate the 'next_step_message'.
-                self.logger.info(f"La tarea continúa. Acción ejecutada: {accion_ejecutada}")
-                # Optionally, update current_message based on the result of the last action
-                # For now, we rely on the LLM's ability to use chat history and screen analysis.
-                self.state = AgentState.PLANNING # After executing an action, go back to planning for the next step
+                self.state = AgentState.PLANNING
 
         if not task_completed:
-            self.logger.warning(f"La tarea no se completó después de {max_task_cycles} ciclos.")
-            self.comunicador.hablar(f"No pude completar la tarea después de {max_task_cycles} intentos. Por favor, intenta de nuevo o sé más específico.")
-            self.state = AgentState.TASK_FAILED # Task failed due to max cycles reached
+            self.state = AgentState.TASK_FAILED
         
-        self.state = AgentState.IDLE # Reset state to IDLE after task completion or failure
-
+        self.state = AgentState.IDLE
 
 if __name__ == '__main__':
     print("Este es el nuevo agente. No contiene un bloque de prueba principal.")
